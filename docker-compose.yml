@@ -1,0 +1,19 @@
+services:
+  mynumeri:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mynumeri
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    networks:
+      - mysagra_default
+
+networks:
+  mysagra_default:
+    external: true
