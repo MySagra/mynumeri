@@ -7,14 +7,14 @@ declare module "next-auth" {
             username: string;
             role: string;
         };
-        accessToken: string;
+        token: string
         error?: string;
     }
 
     interface User extends DefaultUser {
+        id: string;
         username: string;
         role: string;
-        accessToken: string;
     }
 }
 
@@ -30,10 +30,11 @@ declare module "next-auth/jwt" {
 
 export interface LoginResponse {
     user: {
+        id: string
         username: string;
         role: string;
-    };
-    accessToken: string;
+    },
+    cookieString: string | null
 }
 
 export interface RefreshResponse {

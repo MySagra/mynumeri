@@ -1,11 +1,13 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 export async function GET(request: Request) {
-    const session = await getServerSession(authOptions);
+    const cookieStore = await cookies();
+    const token = cookieStore.get("mysagra_token")?.value;
 
-    if (!session || !session.accessToken) {
+    if (!token) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -20,7 +22,7 @@ export async function GET(request: Request) {
     try {
         const response = await fetch(`${backendUrl}/v1/orders?${searchParams.toString()}`, {
             headers: {
-                "Authorization": `Bearer ${session.accessToken}`,
+                "Cookie": token ? `mysagra_token=${token}` : "",
             },
             cache: 'no-store'
         });

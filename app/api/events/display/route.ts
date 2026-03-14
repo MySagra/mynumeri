@@ -1,10 +1,12 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { cookies } from "next/headers";
 
 export async function GET(request: Request) {
-    const session = await getServerSession(authOptions);
+    const cookieStore = await cookies();
+    const token = cookieStore.get("mysagra_token")?.value;
 
-    if (!session || !session.accessToken) {
+    if (!token) {
         return new Response("Unauthorized", { status: 401 });
     }
 
@@ -12,8 +14,8 @@ export async function GET(request: Request) {
 
     const response = await fetch(`${backendUrl}/events/display`, {
         headers: {
-            "Authorization": `Bearer ${session.accessToken}`,
             "Accept": "text/event-stream",
+            "Cookie": token ? `mysagra_token=${token}` : "",
         }
     });
 

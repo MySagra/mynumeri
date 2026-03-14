@@ -46,12 +46,6 @@ export function SessionInfo() {
                     <p className="text-sm font-medium">Ruolo</p>
                     <p className="text-sm text-muted-foreground">{session.user.role}</p>
                 </div>
-                <div>
-                    <p className="text-sm font-medium">Access Token</p>
-                    <p className="text-xs text-muted-foreground font-mono truncate">
-                        {session.accessToken.substring(0, 50)}...
-                    </p>
-                </div>
             </CardContent>
         </Card>
     );

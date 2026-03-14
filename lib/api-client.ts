@@ -13,43 +13,30 @@ export class ApiClient {
      * Login user with username and password
      * The backend sets refresh token as HTTP-only cookie automatically
      */
+    // api-client.ts
     async login(username: string, password: string): Promise<LoginResponse> {
         const response = await fetch(`${this.baseUrl}/auth/login`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
-            credentials: "include", // Important: allows cookies to be sent/received
             body: JSON.stringify({ username, password }),
         });
 
         if (!response.ok) {
-            const error: ApiError = await response.json().catch(() => ({
+            const error = await response.json().catch(() => ({
                 message: "Login failed",
             }));
             throw new Error(error.message || "Invalid credentials");
         }
 
-        return response.json();
-    }
+        const setCookieHeader = response.headers.get('set-cookie');
+        const userData = await response.json();
 
-    /**
-     * Refresh access token using the HTTP-only refresh token cookie
-     */
-    async refreshAccessToken(): Promise<RefreshResponse> {
-        const response = await fetch(`${this.baseUrl}/auth/refresh`, {
-            method: "POST",
-            credentials: "include", // Sends the refresh token cookie
-        });
-
-        if (!response.ok) {
-            const error: ApiError = await response.json().catch(() => ({
-                message: "Token refresh failed",
-            }));
-            throw new Error(error.message || "Failed to refresh token");
-        }
-
-        return response.json();
+        return {
+            user: userData,
+            cookieString: setCookieHeader
+        };
     }
 
     /**

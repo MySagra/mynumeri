@@ -121,3 +121,33 @@
     @apply bg-background text-foreground;
   }
 }
+
+.order-card {
+  animation: order-card-enter 220ms ease both;
+}
+
+.order-card--exit {
+  animation: order-card-exit 200ms ease forwards;
+}
+
+@keyframes order-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes order-card-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}

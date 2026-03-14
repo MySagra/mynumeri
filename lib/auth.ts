@@ -2,9 +2,7 @@ import type { NextAuthOptions, User } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { apiClient } from "./api-client";
 import { JWT } from "next-auth/jwt";
-
-// Access token expires in 15 minutes according to swagger docs
-const ACCESS_TOKEN_LIFETIME = 15 * 60 * 1000; // 15 minutes in milliseconds
+import { cookies } from "next/headers";
 
 export const authOptions: NextAuthOptions = {
     providers: [
@@ -20,75 +18,55 @@ export const authOptions: NextAuthOptions = {
                 }
 
                 try {
-                    const response = await apiClient.login(
+                    const { user, cookieString } = await apiClient.login(
                         credentials.username,
                         credentials.password
                     );
 
-                    // Return user object that will be stored in JWT
+                    if (cookieString) {
+                        const tokenMatch = cookieString.match(/mysagra_token=([^;]+)/);
+
+                        if (tokenMatch && tokenMatch[1]) {
+                            // Usiamo l'API nativa di Next.js per "inoltrare" il cookie al browser
+                            (await cookies()).set({
+                                name: 'mysagra_token',
+                                value: tokenMatch[1],
+                                httpOnly: true,
+                                secure: process.env.NODE_ENV === 'production',
+                                sameSite: 'lax',
+                                path: '/',
+                                maxAge: 6 * 60 * 60 // 6 ore
+                            });
+                        }
+                    }
+
                     return {
-                        id: response.user.username, // NextAuth requires id field
-                        username: response.user.username,
-                        role: response.user.role,
-                        accessToken: response.accessToken,
+                        id: user.username,
+                        username: user.username,
+                        role: user.role,
                     };
                 } catch (error) {
                     console.error("Login error:", error);
                     throw new Error(
-                        error instanceof Error ? error.message : "Errore durante il login"
+                        error instanceof Error ? error.message : "Error during the login"
                     );
                 }
             },
         }),
     ],
     callbacks: {
-        async jwt({ token, user, trigger }): Promise<JWT> {
-            // Initial sign in
+        async jwt({ token, user }): Promise<JWT> {
             if (user) {
                 token.username = user.username;
                 token.role = user.role;
-                token.accessToken = user.accessToken;
-                token.accessTokenExpires = Date.now() + ACCESS_TOKEN_LIFETIME;
-                return token;
             }
-
-            // If we already failed to refresh previously, don't try again and spam the backend
-            if (token.error === "RefreshAccessTokenError") {
-                return token;
-            }
-
-            // Return previous token if access token has not expired yet
-            if (Date.now() < (token.accessTokenExpires as number)) {
-                return token;
-            }
-
-            // Access token has expired, try to refresh it
-            try {
-                const refreshedToken = await apiClient.refreshAccessToken();
-                return {
-                    ...token,
-                    accessToken: refreshedToken.accessToken,
-                    accessTokenExpires: Date.now() + ACCESS_TOKEN_LIFETIME,
-                    error: undefined
-                };
-            } catch (error) {
-                console.error("Failed to refresh access token:", error);
-                // Return token with error flag to trigger re-authentication
-                return {
-                    ...token,
-                    error: "RefreshAccessTokenError",
-                };
-            }
+            return token;
         },
         async session({ session, token }) {
-            // Send properties to the client
             session.user = {
                 username: token.username as string,
                 role: token.role as string,
             };
-            session.accessToken = token.accessToken as string;
-            session.error = token.error as string | undefined;
-
             return session;
         },
     },
@@ -97,7 +75,7 @@ export const authOptions: NextAuthOptions = {
     },
     session: {
         strategy: "jwt",
-        maxAge: 7 * 24 * 60 * 60, // 7 days (matching refresh token lifetime)
+        maxAge: 6 * 60 * 60,
     },
     secret: process.env.NEXTAUTH_SECRET,
 };

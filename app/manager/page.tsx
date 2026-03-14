@@ -34,48 +34,24 @@ const sortByDate = (a: Order, b: Order) => {
 };
 
 export default function Manager() {
-    const { data: session } = useSession();
     const [confirmedOrders, setConfirmedOrders] = useState<Order[]>([]);
     const [readyOrders, setReadyOrders] = useState<Order[]>([]);
     const [pickedUpOrders, setPickedUpOrders] = useState<Order[]>([]);
-
-    useEffect(() => {
-        if (session?.error === "RefreshAccessTokenError") {
-            signOut({ callbackUrl: "/" });
-        }
-    }, [session]);
 
     const fetchOrders = useCallback(async () => {
         try {
             const { dateFrom, dateTo } = getWorkdayBounds();
             const dateParams = `&dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`;
 
-            // Give Next.js enough time to mount before fetching
-            // Fetch CONFIRMED
-            const resConf = await fetch(`/api/orders?status=CONFIRMED&limit=100${dateParams}`);
-            if (resConf.ok) {
-                const json = await resConf.json();
-                console.log("Confirmed Data:", json);
+            const res = await fetch(`/api/orders?limit=100${dateParams}`);
+            if (res.ok) {
+                const json = await res.json();
                 const orders: Order[] = json.data || json.orders || json || [];
-                setConfirmedOrders(Array.isArray(orders) ? orders.sort(sortByDate) : []);
-            }
+                const list = Array.isArray(orders) ? orders : [];
 
-            // Fetch COMPLETED 
-            const resComp = await fetch(`/api/orders?status=COMPLETED&limit=100${dateParams}`);
-            if (resComp.ok) {
-                const json = await resComp.json();
-                console.log("Ready Data:", json)
-                const orders: Order[] = json.data || json.orders || json || [];
-                setReadyOrders(Array.isArray(orders) ? orders.sort(sortByDate) : []);
-            }
-
-            // Fetch PICKED_UP
-            const resPick = await fetch(`/api/orders?status=PICKED_UP&limit=100${dateParams}`);
-            if (resPick.ok) {
-                const json = await resPick.json();
-                console.log("Picked Data:", json)
-                const orders: Order[] = json.data || json.orders || json || [];
-                setPickedUpOrders(Array.isArray(orders) ? orders.sort(sortByDate) : []);
+                setConfirmedOrders(list.filter(o => o.status === "CONFIRMED").sort(sortByDate));
+                setReadyOrders(list.filter(o => o.status === "COMPLETED").sort(sortByDate));
+                setPickedUpOrders(list.filter(o => o.status === "PICKED_UP").sort(sortByDate));
             }
         } catch (error) {
             console.error("Failed to fetch orders:", error);

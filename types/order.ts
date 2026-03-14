@@ -5,5 +5,6 @@ type Order = {
     createdAt?: string;
     customer?: string;
     table?: string;
+    status: `PENDING` | `CONFIRMED` | `COMPLETED` | `PICKED_UP`;
 }
 type Status = `PENDING` | `CONFIRMED` | `COMPLETED` | `PICKED_UP`;
