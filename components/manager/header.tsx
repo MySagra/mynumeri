@@ -84,7 +84,7 @@ export function Header() {
                                     Avvisi Display
                                 </DrawerTitle>
                                 <DrawerDescription className="flex items-center gap-2">
-                                    Gli avvisi verranno mostrati nell'ultima riga della pagina display
+                                    Gli avvisi verranno mostrati infondo alla pagina del display
                                 </DrawerDescription>
                             </DrawerHeader>
                             <Textarea

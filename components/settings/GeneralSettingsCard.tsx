@@ -30,18 +30,20 @@ export function GeneralSettingsCard() {
                     <CardTitle>Generali</CardTitle>
                 </div>
                 <CardDescription className="select-none">
-                    Configura le impostazioni generali dell'interfaccia cassa
+                    Configura le impostazioni generali dell'interfaccia di mynumeri
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                <div className="space-y-1.5">
-                    <Label htmlFor="event-name">Nome della sagra / festa</Label>
-                    <div className="text-sm text-muted-foreground select-none">
-                        Viene mostrato nell'header del display accanto al titolo
+                <div className="flex items-center gap-4">
+                    <div className="space-y-1.5 flex-1">
+                        <Label htmlFor="event-name">Nome della sagra / festa</Label>
+                        <div className="text-sm text-muted-foreground select-none">
+                            Viene mostrato nell'header del display accanto al titolo
+                        </div>
                     </div>
                     <Input
                         id="event-name"
-                        placeholder="es. Sagra della Porchetta 2026"
+                        placeholder="es. Sagra 2026"
                         value={eventName}
                         onChange={handleChange}
                         className="max-w-sm"

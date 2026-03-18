@@ -1,12 +1,13 @@
 services:
   mynumeri:
+    image: mynumeri-numeri
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mynumeri
+    container_name: mynumeri-numeri
     restart: always
     ports:
-      - "8000:8000"
+      - "3033:3033"
     env_file:
       - .env
     environment:

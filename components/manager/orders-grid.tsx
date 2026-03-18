@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Undo2, CheckCircle } from "lucide-react";
+import { Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Card, CardContent } from "@/components/ui/card"

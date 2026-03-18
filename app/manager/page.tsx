@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession, signOut } from "next-auth/react";
 import { Header } from "@/components/manager/header";
 import OrdersGrid from "@/components/manager/orders-grid";
 import { PickedUpOrdersSheet } from "@/components/manager/picked-up-orders-sheet";
