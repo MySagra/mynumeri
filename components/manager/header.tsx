@@ -1,26 +1,43 @@
 "use client";
 
-import { Settings, FileText, Monitor, LogOut } from "lucide-react";
+import { Settings, FileText, Monitor, Maximize, Minimize } from "lucide-react";
 import { Button } from "../ui/button";
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { logout as logoutAction } from "@/actions/auth";
 import { toast } from "sonner";
 import { ButtonGroup } from "../ui/button-group";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { UserMenu } from "@/components/manager/UserMenu";
 
 export function Header() {
     const router = useRouter();
+    const { data: session } = useSession();
 
     const [noticeText, setNoticeText] = useState("");
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
     useEffect(() => {
         const stored = localStorage.getItem("display-announcement");
         if (stored) setNoticeText(stored);
     }, []);
+
+    useEffect(() => {
+        const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+        document.addEventListener("fullscreenchange", onChange);
+        return () => document.removeEventListener("fullscreenchange", onChange);
+    }, []);
+
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+        } else {
+            document.exitFullscreen();
+        }
+    };
 
     const saveAnnouncement = async () => {
         localStorage.setItem("display-announcement", noticeText);
@@ -38,16 +55,11 @@ export function Header() {
 
     const handleLogout = async () => {
         try {
-            // Call backend logout to revoke refresh token
             await logoutAction();
-
-            // Then sign out from NextAuth
             await signOut({ redirect: true, callbackUrl: "/" });
-
             toast.success("Logout effettuato con successo");
         } catch (error) {
             console.error("Logout error:", error);
-            // Still try to sign out even if backend logout fails
             await signOut({ redirect: true, callbackUrl: "/" });
         }
     };
@@ -68,6 +80,12 @@ export function Header() {
                         <Settings className="h-4 w-4" />
                     </Button>
                     <ThemeToggle />
+                    <Button variant="outline" size="icon" onClick={toggleFullscreen}>
+                        {isFullscreen
+                            ? <Minimize className="h-4 w-4" />
+                            : <Maximize className="h-4 w-4" />
+                        }
+                    </Button>
                 </ButtonGroup>
                 <Drawer>
                     <DrawerTrigger asChild>
@@ -113,10 +131,9 @@ export function Header() {
                         Apri Display
                     </a>
                 </Button>
-                <Button variant="outline" onClick={handleLogout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Logout
-                </Button>
+                {session?.user && (
+                    <UserMenu user={session.user} onLogout={handleLogout} />
+                )}
             </div>
         </header>
     );

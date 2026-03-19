@@ -29,7 +29,7 @@ export const authOptions: NextAuthOptions = {
                         if (tokenMatch && tokenMatch[1]) {
                             // Usiamo l'API nativa di Next.js per "inoltrare" il cookie al browser
                             (await cookies()).set({
-                                name: 'mysagra_token',
+                                name: 'mynumeri_token',
                                 value: tokenMatch[1],
                                 httpOnly: true,
                                 secure: process.env.NODE_ENV === 'production',
@@ -68,6 +68,34 @@ export const authOptions: NextAuthOptions = {
                 role: token.role as string,
             };
             return session;
+        },
+    },
+    cookies: {
+        sessionToken: {
+            name: 'mynumeri_next-auth.session-token',
+            options: {
+                httpOnly: true,
+                sameSite: 'lax',
+                path: '/',
+                secure: process.env.NODE_ENV === 'production',
+            },
+        },
+        callbackUrl: {
+            name: 'mynumeri_next-auth.callback-url',
+            options: {
+                sameSite: 'lax',
+                path: '/',
+                secure: process.env.NODE_ENV === 'production',
+            },
+        },
+        csrfToken: {
+            name: 'mynumeri_next-auth.csrf-token',
+            options: {
+                httpOnly: true,
+                sameSite: 'lax',
+                path: '/',
+                secure: process.env.NODE_ENV === 'production',
+            },
         },
     },
     pages: {

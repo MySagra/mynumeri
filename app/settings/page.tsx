@@ -2,7 +2,6 @@
 
 import { SettingsHeader } from "@/components/settings/header";
 import { AppearanceSettingsCard } from "@/components/settings/AppearanceSettingsCard";
-import { AboutSettingsCard } from "@/components/settings/AboutSettingsCard";
 import { GeneralSettingsCard } from "@/components/settings/GeneralSettingsCard";
 import { DisplayModeSettingsCard } from "@/components/settings/DisplayModeSettingsCard";
 
@@ -15,7 +14,6 @@ export default function SettingsPage() {
                     <GeneralSettingsCard />
                     <DisplayModeSettingsCard />
                     <AppearanceSettingsCard />
-                    <AboutSettingsCard />
                 </div>
             </main>
         </>
