@@ -1,9 +1,11 @@
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { ButtonGroup } from "@/components/ui/button-group"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Field, FieldDescription, FieldGroup, FieldLabel, } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { FormField, FormItem, FormControl } from "@/components/ui/form"
+import { Eye, EyeOff } from "lucide-react"
 import { useRouter } from "next/navigation";
 import { useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -15,6 +17,7 @@ import z from "zod"
 export function LoginForm() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const formSchema = z.object({
         username: z.string().min(1, "Username obbligatorio"),
@@ -39,7 +42,7 @@ export function LoginForm() {
             });
 
             if (result?.error) {
-                toast.error(result.error || "Credenziali non valide");
+                toast.error("Credenziali non valide");
                 form.reset();
             } else if (result?.ok) {
                 // Successful login
@@ -113,7 +116,18 @@ export function LoginForm() {
                                         render={({ field }) => (
                                             <FormItem>
                                                 <FormControl>
-                                                    <Input autoComplete="off" placeholder="Your password" type="password" {...field} />
+                                                    <ButtonGroup className="w-full">
+                                                        <Input autoComplete="off" placeholder="La tua password" type={showPassword ? "text" : "password"} {...field} />
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="icon"
+                                                            tabIndex={-1}
+                                                            onClick={() => setShowPassword(p => !p)}
+                                                        >
+                                                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                        </Button>
+                                                    </ButtonGroup>
                                                 </FormControl>
                                             </FormItem>
                                         )}
@@ -126,7 +140,7 @@ export function LoginForm() {
                                 </Field>
                             </FieldGroup>
                         </form>
-                        <div className="bg-white flex items-center justify-center h-150 w-full">
+                        <div className="hidden md:flex bg-white items-center justify-center h-150 w-full">
                             <img
                                 src="/placeholder.jpg"
                                 alt="Logo"

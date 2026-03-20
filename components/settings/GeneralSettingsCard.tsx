@@ -34,8 +34,8 @@ export function GeneralSettingsCard() {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                <div className="flex items-center gap-4">
-                    <div className="space-y-1.5 flex-1">
+                <div className="flex flex-col md:flex-row md:items-center gap-3">
+                    <div className="space-y-1.5 md:flex-1">
                         <Label htmlFor="event-name">Nome della sagra / festa</Label>
                         <div className="text-sm text-muted-foreground select-none">
                             Viene mostrato nell'header del display accanto al titolo
@@ -46,7 +46,7 @@ export function GeneralSettingsCard() {
                         placeholder="es. Sagra 2026"
                         value={eventName}
                         onChange={handleChange}
-                        className="max-w-sm"
+                        className="w-full md:max-w-sm"
                     />
                 </div>
             </CardContent>

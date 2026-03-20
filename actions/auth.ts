@@ -1,8 +1,7 @@
 "use server";
 
 import { apiClient } from "@/lib/api-client";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -11,11 +10,6 @@ import { revalidatePath } from "next/cache";
  */
 export async function login(username: string, password: string) {
     try {
-        // The actual login happens through NextAuth's credential provider
-        // We just need to validate and return result
-        // The client will call NextAuth's signIn directly
-
-        // Validate inputs
         if (!username || !password) {
             return {
                 success: false,
@@ -23,12 +17,9 @@ export async function login(username: string, password: string) {
             };
         }
 
-        // Try to authenticate with backend directly to give better error messages
         try {
             await apiClient.login(username, password);
-            return {
-                success: true,
-            };
+            return { success: true };
         } catch (error) {
             return {
                 success: false,
@@ -49,16 +40,12 @@ export async function login(username: string, password: string) {
  */
 export async function logout() {
     try {
-        // First, revoke the refresh token on the backend
         await apiClient.logout();
     } catch (error) {
         console.error("Backend logout error:", error);
-        // Continue even if backend logout fails
     }
 
-    // Revalidate paths to clear cached data
     revalidatePath("/");
-
     return { success: true };
 }
 
@@ -66,5 +53,5 @@ export async function logout() {
  * Get current session from server
  */
 export async function getSession() {
-    return await getServerSession(authOptions);
+    return await auth();
 }

@@ -9,7 +9,10 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ChevronDownIcon, LogOutIcon } from "lucide-react"
+import { ChevronDownIcon, LogOutIcon, Settings, Sun, Moon } from "lucide-react"
+import { useTheme } from "next-themes"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 
 interface UserMenuProps {
     user: {
@@ -31,6 +34,11 @@ function UserAvatar({ initials, size = 8 }: { initials: string; size?: number })
 
 export function UserMenu({ user, onLogout }: UserMenuProps) {
     const initials = user.username.slice(0, 2).toUpperCase()
+    const router = useRouter()
+    const { theme, setTheme } = useTheme()
+    const [mounted, setMounted] = useState(false)
+
+    useEffect(() => { setMounted(true) }, [])
 
     return (
         <DropdownMenu>
@@ -50,6 +58,23 @@ export function UserMenu({ user, onLogout }: UserMenuProps) {
                         </div>
                     </div>
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator className="md:hidden" />
+                <DropdownMenuItem
+                    className="md:hidden cursor-pointer"
+                    onClick={() => router.push("/settings")}
+                >
+                    <Settings className="h-4 w-4" />
+                    Impostazioni
+                </DropdownMenuItem>
+                {mounted && (
+                    <DropdownMenuItem
+                        className="md:hidden cursor-pointer"
+                        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                    >
+                        {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                        {theme === "dark" ? "Tema chiaro" : "Tema scuro"}
+                    </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onLogout} className="cursor-pointer">
                     <LogOutIcon className="h-4 w-4" />

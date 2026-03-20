@@ -16,10 +16,10 @@ interface OrdersGridProps {
 
 export default function OrdersGrid({ className, orders, title, status, onPrev, onNext, children }: OrdersGridProps) {
     return (
-        <div className={cn("select-none h-full w-full rounded-xl outline-2 outline-secondary bg-card shadow-lg p-4 overflow-y-auto", className)}>
+        <div className={cn("select-none h-full w-full rounded-xl outline-2 outline-secondary bg-card shadow-lg px-4 pb-4 overflow-y-auto", className)}>
             {
                 title || children ?
-                    <div className="flex place-content-between items-center sticky top-0 bg-card z-10 pb-2">
+                    <div className="flex place-content-between items-center sticky top-0 bg-card z-10 pt-4 pb-2">
                         {
                             title ? <h2 className="select-none text-2xl font-bold mb-4">{title}</h2> : <></>
                         }

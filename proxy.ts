@@ -1,21 +1,13 @@
-import { getToken } from "next-auth/jwt";
+import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
 
-export async function proxy(req: NextRequest) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET, cookieName: 'mynumeri_next-auth.session-token' })
-
-    if(!token) {
-        return NextResponse.redirect(new URL('/', req.url))
+export const proxy = auth((req) => {
+    if (!req.auth) {
+        return NextResponse.redirect(new URL("/", req.url));
     }
+    return NextResponse.next();
+});
 
-    return NextResponse.next()
-}
-
-// Protect these routes (display is now public)
 export const config = {
-    matcher: [
-        "/manager/:path*",
-        "/settings/:path*",
-    ],
+    matcher: ["/manager/:path*", "/settings/:path*"],
 };

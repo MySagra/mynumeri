@@ -59,7 +59,7 @@ export function DisplayModeSettingsCard() {
                 <div className="text-sm text-muted-foreground select-none mb-2">
                     Seleziona cosa mostrare nella pagina display pubblica
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {MODES.map(({ value, label, description }) => (
                         <button
                             key={value}

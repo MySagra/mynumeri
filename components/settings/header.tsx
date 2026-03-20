@@ -15,11 +15,11 @@ export function SettingsHeader() {
                     alt="Logo"
                     className="mx-auto h-10 w-auto select-none"
                 />
-                <h1 className="text-2xl font-bold select-none">Impostazioni</h1>
+                <h1 className="text-2xl font-bold select-none hidden md:block">Impostazioni</h1>
             </div>
             <Button variant="outline" onClick={() => router.push("/manager")}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Torna al Manager
+                <ArrowLeft className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Torna al Manager</span>
             </Button>
         </header>
     );

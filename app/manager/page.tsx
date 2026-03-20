@@ -26,11 +26,14 @@ function getWorkdayBounds() {
     };
 }
 
-const sortByDate = (a: Order, b: Order) => {
-    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : Date.now();
-    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : Date.now();
-    return timeA - timeB;
-};
+const sortByTicket = (a: Order, b: Order) => a.ticketNumber - b.ticketNumber;
+
+const toOrder = (o: Order): Order => ({
+    id: o.id,
+    ticketNumber: o.ticketNumber,
+    displayCode: o.displayCode,
+    status: o.status,
+});
 
 export default function Manager() {
     const [confirmedOrders, setConfirmedOrders] = useState<Order[]>([]);
@@ -45,12 +48,12 @@ export default function Manager() {
             const res = await fetch(`/api/orders?limit=100${dateParams}`);
             if (res.ok) {
                 const json = await res.json();
-                const orders: Order[] = json.data || json.orders || json || [];
-                const list = Array.isArray(orders) ? orders : [];
+                const raw: Order[] = json.data || json.orders || json || [];
+                const list = Array.isArray(raw) ? raw.map(toOrder) : [];
 
-                setConfirmedOrders(list.filter(o => o.status === "CONFIRMED").sort(sortByDate));
-                setReadyOrders(list.filter(o => o.status === "COMPLETED").sort(sortByDate));
-                setPickedUpOrders(list.filter(o => o.status === "PICKED_UP").sort(sortByDate));
+                setConfirmedOrders(list.filter(o => o.status === "CONFIRMED").sort(sortByTicket));
+                setReadyOrders(list.filter(o => o.status === "COMPLETED").sort(sortByTicket));
+                setPickedUpOrders(list.filter(o => o.status === "PICKED_UP").sort(sortByTicket));
             }
         } catch (error) {
             console.error("Failed to fetch orders:", error);
@@ -62,29 +65,19 @@ export default function Manager() {
         fetchOrders();
 
         // Then setup SSE EventSource
-        let isConnected = false;
         const eventSource = new EventSource('/api/events/display');
 
         eventSource.onopen = () => {
             console.log("SSE connected");
-            isConnected = true;
-            // Also fetch to sync state if we were disconnected
             fetchOrders();
         };
 
         const handleConfirmedOrder = (event: MessageEvent) => {
             try {
-                const newOrder = JSON.parse(event.data);
-
-                // Assign a createdAt if it doesn't have one, so sorting remains stable across renders
-                if (!newOrder.createdAt) {
-                    newOrder.createdAt = new Date().toISOString();
-                }
-
-                // Ensure we don't duplicate
+                const newOrder = toOrder(JSON.parse(event.data));
                 setConfirmedOrders(prev => {
                     if (prev.find(o => String(o.id) === String(newOrder.id))) return prev;
-                    return [...prev, newOrder].sort(sortByDate);
+                    return [...prev, newOrder].sort(sortByTicket);
                 });
             } catch (err) {
                 console.error("Error parsing confirmed-order event:", err);
@@ -92,8 +85,22 @@ export default function Manager() {
         };
 
         eventSource.addEventListener('confirmed-order', handleConfirmedOrder);
-        // Fallback for standard message
         eventSource.onmessage = handleConfirmedOrder;
+
+        eventSource.addEventListener('order-status-update', (event: MessageEvent) => {
+            try {
+                const updated: Order = toOrder(JSON.parse(event.data));
+                const sid = String(updated.id);
+                setConfirmedOrders(prev => prev.filter(o => String(o.id) !== sid));
+                setReadyOrders(prev => prev.filter(o => String(o.id) !== sid));
+                setPickedUpOrders(prev => prev.filter(o => String(o.id) !== sid));
+                if (updated.status === 'CONFIRMED') setConfirmedOrders(prev => [...prev, updated].sort(sortByTicket));
+                if (updated.status === 'COMPLETED') setReadyOrders(prev => [...prev, updated].sort(sortByTicket));
+                if (updated.status === 'PICKED_UP') setPickedUpOrders(prev => [...prev, updated].sort(sortByTicket));
+            } catch (err) {
+                console.error("Error parsing order-status-update event:", err);
+            }
+        });
 
         eventSource.onerror = (error) => {
             console.error("SSE connection error:", error);
@@ -124,25 +131,25 @@ export default function Manager() {
 
     const handleConfirmToComplete = (order: Order) => {
         setConfirmedOrders(prev => prev.filter(o => o.id !== order.id));
-        setReadyOrders(prev => [...prev, order].sort(sortByDate));
+        setReadyOrders(prev => [...prev, order].sort(sortByTicket));
         updateOrderStatus(order.id, 'COMPLETED');
     };
 
     const handleCompleteToConfirm = (order: Order) => {
         setReadyOrders(prev => prev.filter(o => o.id !== order.id));
-        setConfirmedOrders(prev => [...prev, order].sort(sortByDate));
+        setConfirmedOrders(prev => [...prev, order].sort(sortByTicket));
         updateOrderStatus(order.id, 'CONFIRMED');
     };
 
     const handleCompleteToPickup = (order: Order) => {
         setReadyOrders(prev => prev.filter(o => o.id !== order.id));
-        setPickedUpOrders(prev => [...prev, order].sort(sortByDate));
+        setPickedUpOrders(prev => [...prev, order].sort(sortByTicket));
         updateOrderStatus(order.id, 'PICKED_UP');
     };
 
     const handlePickupToComplete = (order: Order) => {
         setPickedUpOrders(prev => prev.filter(o => o.id !== order.id));
-        setReadyOrders(prev => [...prev, order].sort(sortByDate));
+        setReadyOrders(prev => [...prev, order].sort(sortByTicket));
         updateOrderStatus(order.id, 'COMPLETED');
     };
 
@@ -150,17 +157,17 @@ export default function Manager() {
         <div className="h-screen w-full flex flex-col overflow-hidden">
             <Header />
             <main className="flex-1 w-full overflow-hidden">
-                <div className="h-full w-full grid grid-cols-3 gap-4 p-3 pt-24 max-w-[1920px] mx-auto">
+                <div className="h-full w-full flex flex-col md:grid md:grid-cols-3 gap-3 p-3 pt-20 md:pt-24 max-w-[1920px] mx-auto">
                     <OrdersGrid
                         status="CONFIRMED"
-                        className="col-span-2 min-w-0"
+                        className="flex-1 min-h-0 min-w-0 md:flex-none md:col-span-2 md:h-full"
                         orders={confirmedOrders}
                         title="Ordini in preparazione"
                         onNext={handleConfirmToComplete}
                     />
                     <OrdersGrid
                         status="COMPLETED"
-                        className="col-span-1 min-w-0"
+                        className="flex-1 min-h-0 min-w-0 md:flex-none md:col-span-1 md:h-full"
                         orders={readyOrders}
                         title="Ordini pronti"
                         onPrev={handleCompleteToConfirm}

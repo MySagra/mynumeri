@@ -1,33 +1,29 @@
-import type { NextAuthOptions, User } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
+import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials";
 import { apiClient } from "./api-client";
-import { JWT } from "next-auth/jwt";
 import { cookies } from "next/headers";
 
-export const authOptions: NextAuthOptions = {
+export const { handlers, auth, signIn, signOut } = NextAuth({
     providers: [
-        CredentialsProvider({
-            name: "Credentials",
+        Credentials({
             credentials: {
                 username: { label: "Username", type: "text" },
                 password: { label: "Password", type: "password" },
             },
-            async authorize(credentials): Promise<User | null> {
+            async authorize(credentials) {
                 if (!credentials?.username || !credentials?.password) {
                     throw new Error("Username e password sono obbligatori");
                 }
 
                 try {
                     const { user, cookieString } = await apiClient.login(
-                        credentials.username,
-                        credentials.password
+                        credentials.username as string,
+                        credentials.password as string
                     );
 
                     if (cookieString) {
                         const tokenMatch = cookieString.match(/mysagra_token=([^;]+)/);
-
                         if (tokenMatch && tokenMatch[1]) {
-                            // Usiamo l'API nativa di Next.js per "inoltrare" il cookie al browser
                             (await cookies()).set({
                                 name: 'mynumeri_token',
                                 value: tokenMatch[1],
@@ -35,7 +31,7 @@ export const authOptions: NextAuthOptions = {
                                 secure: process.env.NODE_ENV === 'production',
                                 sameSite: 'lax',
                                 path: '/',
-                                maxAge: 6 * 60 * 60 // 6 ore
+                                maxAge: 6 * 60 * 60
                             });
                         }
                     }
@@ -48,14 +44,14 @@ export const authOptions: NextAuthOptions = {
                 } catch (error) {
                     console.error("Login error:", error);
                     throw new Error(
-                        error instanceof Error ? error.message : "Error during the login"
+                        error instanceof Error ? error.message : "Errore durante il login"
                     );
                 }
             },
         }),
     ],
     callbacks: {
-        async jwt({ token, user }): Promise<JWT> {
+        async jwt({ token, user }) {
             if (user) {
                 token.username = user.username;
                 token.role = user.role;
@@ -63,47 +59,16 @@ export const authOptions: NextAuthOptions = {
             return token;
         },
         async session({ session, token }) {
-            session.user = {
-                username: token.username as string,
-                role: token.role as string,
-            };
+            session.user.username = token.username as string;
+            session.user.role = token.role as string;
             return session;
         },
     },
-    cookies: {
-        sessionToken: {
-            name: 'mynumeri_next-auth.session-token',
-            options: {
-                httpOnly: true,
-                sameSite: 'lax',
-                path: '/',
-                secure: process.env.NODE_ENV === 'production',
-            },
-        },
-        callbackUrl: {
-            name: 'mynumeri_next-auth.callback-url',
-            options: {
-                sameSite: 'lax',
-                path: '/',
-                secure: process.env.NODE_ENV === 'production',
-            },
-        },
-        csrfToken: {
-            name: 'mynumeri_next-auth.csrf-token',
-            options: {
-                httpOnly: true,
-                sameSite: 'lax',
-                path: '/',
-                secure: process.env.NODE_ENV === 'production',
-            },
-        },
-    },
     pages: {
-        signIn: "/", // Login page route
+        signIn: "/",
     },
     session: {
         strategy: "jwt",
         maxAge: 6 * 60 * 60,
     },
-    secret: process.env.NEXTAUTH_SECRET,
-};
+});

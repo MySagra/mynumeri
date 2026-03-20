@@ -15,7 +15,7 @@ export function PickedUpOrdersSheet({ pickedUpOrders, onPrev }: PickedUpOrdersSh
             <SheetTrigger asChild>
                 <Button variant="outline">Ordini ritirati</Button>
             </SheetTrigger>
-            <SheetContent>
+            <SheetContent className="w-[90vw] sm:max-w-sm">
                 <SheetHeader>
                     <SheetTitle className="text-2xl font-bold">Ordini ritirati</SheetTitle>
                     <SheetDescription>Elenco degli ordini già ritirati dai clienti</SheetDescription>
