@@ -359,6 +359,18 @@ export default function Display() {
         const es = new EventSource("/api/events/display");
         es.onopen = () => fetchOrders();
 
+        es.addEventListener("confirmed-order", (event: MessageEvent) => {
+            const data = JSON.parse(event.data) as ReadyOrder;
+            const mode = displayModeRef.current;
+
+            if (mode === "preparing" || mode === "hybrid") {
+                setPrepOrders((prev) => {
+                    if (prev.find((o) => String(o.id) === String(data.id))) return prev;
+                    return [...prev, data];
+                });
+            }
+        });
+
         es.addEventListener("order-status-update", (event: MessageEvent) => {
             const data = JSON.parse(event.data) as ReadyOrder;
             const mode = displayModeRef.current;

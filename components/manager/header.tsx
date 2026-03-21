@@ -45,6 +45,20 @@ export function Header({ pickedUpOrders, onPickupPrev }: HeaderProps = {}) {
     }, []);
 
     useEffect(() => {
+        const es = new EventSource("/api/announcement/events");
+        es.onmessage = (event) => {
+            try {
+                const { announcement: text } = JSON.parse(event.data);
+                setAvvisiOpen(open => {
+                    if (!open) setNoticeText(text);
+                    return open;
+                });
+            } catch { /* ignore */ }
+        };
+        return () => es.close();
+    }, []);
+
+    useEffect(() => {
         const onChange = () => setIsFullscreen(!!document.fullscreenElement);
         document.addEventListener("fullscreenchange", onChange);
         return () => document.removeEventListener("fullscreenchange", onChange);
