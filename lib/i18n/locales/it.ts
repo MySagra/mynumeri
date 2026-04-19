@@ -1,0 +1,102 @@
+export const it = {
+  translation: {
+    common: {
+      poweredBy: "Powered by"
+    },
+    login: {
+      welcome: "Benvenuto!",
+      subtitle: "Esegui il login al tuo account MyNumeri",
+      username: "Username",
+      usernamePlaceholder: "Username o Email",
+      password: "Password",
+      passwordPlaceholder: "La tua password",
+      loginBtn: "Accedi",
+      loggingIn: "Accesso...",
+      usernameRequired: "Username obbligatorio",
+      passwordRequired: "Password obbligatoria",
+      bothRequired: "Username e Password sono obbligatori",
+      invalidCredentials: "Credenziali non valide",
+      loginSuccess: "Login effettuato con successo!",
+      loginError: "Errore durante il login",
+      validationError: "Errore di validazione"
+    },
+    manager: {
+      preparingOrders: "Ordini in preparazione",
+      readyOrders: "Ordini pronti",
+      pickedUpOrders: "Ordini ritirati",
+      pickedUpOrdersDesc: "Elenco degli ordini già ritirati dai clienti",
+      displayNotices: "Avvisi Display",
+      displayNoticesDesc: "Gli avvisi verranno mostrati infondo alla pagina del display",
+      noticesPlaceholder: "Es: Promozione del giorno, orari speciali, avvisi...",
+      empty: "Svuota",
+      cancel: "Annulla",
+      saveNotices: "Salva Avvisi",
+      noticeSaved: "Avviso salvato e inviato al display",
+      noticeSaveError: "Errore durante il salvataggio dell'avviso",
+      logoutSuccess: "Logout effettuato con successo",
+      openDisplay: "Apri Display"
+    },
+    display: {
+      notice: "Avviso",
+      preparing: "In preparazione",
+      ready: "Pronti",
+      ordersReady: "Ordini Pronti",
+      ordersPreparing: "Ordini in Preparazione",
+      orders: "Ordini",
+      orderReadyCode: "Ordine pronto codice:",
+      preparingOrderCode: "Stiamo preparando l'ordine:"
+    },
+    settings: {
+      appearance: "Aspetto",
+      appearanceDesc: "Personalizza l'aspetto dell'applicazione",
+      theme: "Tema",
+      themeDesc: "Scegli tra tema chiaro e scuro",
+      light: "Chiaro",
+      dark: "Scuro",
+      displayModeReady: "Solo pronti",
+      displayModeReadyDesc: "Mostra solo gli ordini pronti per il ritiro",
+      displayModePrep: "Solo in preparazione",
+      displayModePrepDesc: "Mostra solo gli ordini attualmente in preparazione",
+      displayModeHybrid: "Vista ibrida",
+      displayModeHybridDesc: "¾ della pagina per gli ordini in preparazione e ¼ per gli ordini pronti",
+      display: "Display",
+      displayDesc: "Modifica la pagina del display",
+      operativeMode: "Modalità operativa",
+      operativeModeDesc: "Seleziona cosa mostrare nella pagina display pubblica",
+      saving: "Salvataggio...",
+      save: "Salva",
+      displayModeSaved: "Modalità display salvata",
+      saveError: "Errore durante il salvataggio",
+      general: "Generali",
+      generalDesc: "Configura le impostazioni generali dell'interfaccia di mynumeri",
+      eventName: "Nome della sagra / festa",
+      eventNameDesc: "Viene mostrato nell'header del display accanto al titolo",
+      eventNamePlaceholder: "es. Sagra 2026",
+      eventNameSaved: "Nome evento salvato",
+      settings: "Impostazioni",
+      backToManager: "Torna al Manager"
+    },
+    session: {
+      logoutSuccess: "Logout effettuato con successo",
+      logout: "Logout",
+      loading: "Caricamento...",
+      unauthenticated: "Non autenticato",
+      loginPrompt: "Effettua il login per vedere le tue informazioni",
+      sessionInfo: "Informazioni Sessione",
+      authenticatedUserData: "Dati utente autenticato",
+      username: "Username",
+      role: "Ruolo",
+      toggleTheme: "Cambia tema"
+    },
+    userMenu: {
+      settings: "Impostazioni",
+      lightTheme: "Tema chiaro",
+      darkTheme: "Tema scuro",
+      notices: "Avvisi Display",
+      logout: "Esci",
+      language: "Lingua",
+      italian: "Italiano",
+      english: "Inglese"
+    }
+  }
+};
