@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export function ThemeToggle() {
     const { theme, setTheme } = useTheme();
+    const { t } = useTranslation();
     const [mounted, setMounted] = useState(false);
 
     // Prevent hydration mismatch by only rendering after mount
@@ -27,7 +29,7 @@ export function ThemeToggle() {
             variant="outline"
             size="icon"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            aria-label="Toggle theme"
+            aria-label={t("session.toggleTheme")}
         >
             {theme === "dark" ? (
                 <Sun className="h-5 w-5" />

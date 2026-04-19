@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Header } from "@/components/manager/header";
 import OrdersGrid from "@/components/manager/orders-grid";
 import { PickedUpOrdersSheet } from "@/components/manager/picked-up-orders-sheet";
+import { useTranslation } from "react-i18next";
 
 function getWorkdayBounds() {
     const now = new Date();
@@ -36,6 +37,7 @@ const toOrder = (o: Order): Order => ({
 });
 
 export default function Manager() {
+    const { t } = useTranslation();
     const [confirmedOrders, setConfirmedOrders] = useState<Order[]>([]);
     const [readyOrders, setReadyOrders] = useState<Order[]>([]);
     const [pickedUpOrders, setPickedUpOrders] = useState<Order[]>([]);
@@ -162,14 +164,14 @@ export default function Manager() {
                         status="CONFIRMED"
                         className="flex-1 min-h-0 min-w-0 md:flex-none md:col-span-2 md:h-full"
                         orders={confirmedOrders}
-                        title="Ordini in preparazione"
+                        title={t("manager.preparingOrders")}
                         onNext={handleConfirmToComplete}
                     />
                     <OrdersGrid
                         status="COMPLETED"
                         className="flex-1 min-h-0 min-w-0 md:flex-none md:col-span-1 md:h-full"
                         orders={readyOrders}
-                        title="Ordini pronti"
+                        title={t("manager.readyOrders")}
                         onPrev={handleCompleteToConfirm}
                         onNext={handleCompleteToPickup}
                     >

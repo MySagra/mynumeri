@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { UserMenu } from "@/components/manager/UserMenu";
 import { PickedUpOrdersSheet } from "@/components/manager/picked-up-orders-sheet";
+import { useTranslation } from "react-i18next";
 
 interface HeaderProps {
     pickedUpOrders?: Order[];
@@ -22,6 +23,7 @@ interface HeaderProps {
 export function Header({ pickedUpOrders, onPickupPrev }: HeaderProps = {}) {
     const router = useRouter();
     const { data: session } = useSession();
+    const { t } = useTranslation();
 
     const [noticeText, setNoticeText] = useState("");
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -79,9 +81,9 @@ export function Header({ pickedUpOrders, onPickupPrev }: HeaderProps = {}) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ announcement: noticeText }),
             });
-            toast.success("Avviso salvato e inviato al display");
+            toast.success(t("manager.noticeSaved"));
         } catch {
-            toast.error("Errore durante il salvataggio dell'avviso");
+            toast.error(t("manager.noticeSaveError"));
         }
     };
 
@@ -89,7 +91,7 @@ export function Header({ pickedUpOrders, onPickupPrev }: HeaderProps = {}) {
         try {
             await logoutAction();
             await signOut({ redirect: true, callbackUrl: "/" });
-            toast.success("Logout effettuato con successo");
+            toast.success(t("manager.logoutSuccess"));
         } catch (error) {
             console.error("Logout error:", error);
             await signOut({ redirect: true, callbackUrl: "/" });
@@ -128,7 +130,7 @@ export function Header({ pickedUpOrders, onPickupPrev }: HeaderProps = {}) {
                     <DrawerTrigger asChild>
                         <Button variant="outline" className="hidden md:flex">
                             <FileText className="h-4 w-4 mr-2" />
-                            Avvisi Display
+                            {t("manager.displayNotices")}
                         </Button>
                     </DrawerTrigger>
                     <DrawerContent>
@@ -136,17 +138,17 @@ export function Header({ pickedUpOrders, onPickupPrev }: HeaderProps = {}) {
                             <DrawerHeader>
                                 <DrawerTitle className="flex items-center gap-2">
                                     <FileText className="h-5 w-5" />
-                                    Avvisi Display
+                                    {t("manager.displayNotices")}
                                 </DrawerTitle>
                                 <DrawerDescription className="flex items-center gap-2 text-left">
-                                    Gli avvisi verranno mostrati infondo alla pagina del display
+                                    {t("manager.displayNoticesDesc")}
                                 </DrawerDescription>
                             </DrawerHeader>
                             <div className="mx-4">
                                 <Textarea
                                     id="notes-textarea"
                                     className="w-full min-h-[200px] px-3 py-2 text-sm border rounded-md resize-none"
-                                    placeholder="Es: Promozione del giorno, orari speciali, avvisi..."
+                                    placeholder={t("manager.noticesPlaceholder")}
                                     value={noticeText}
                                     onChange={(e) => setNoticeText(e.target.value)}
                                 />
@@ -154,14 +156,14 @@ export function Header({ pickedUpOrders, onPickupPrev }: HeaderProps = {}) {
                             <DrawerFooter>
                                 <div className="flex items-center gap-2 justify-between">
                                     <Button variant="destructive" onClick={() => setNoticeText("")}>
-                                        Svuota
+                                        {t("manager.empty")}
                                     </Button>
                                     <div className="flex items-center gap-2">
                                         <DrawerClose asChild>
-                                            <Button variant="outline">Annulla</Button>
+                                            <Button variant="outline">{t("manager.cancel")}</Button>
                                         </DrawerClose>
                                         <DrawerClose asChild>
-                                            <Button onClick={saveAnnouncement}>Salva Avvisi</Button>
+                                            <Button onClick={saveAnnouncement}>{t("manager.saveNotices")}</Button>
                                         </DrawerClose>
                                     </div>
                                 </div>
@@ -172,7 +174,7 @@ export function Header({ pickedUpOrders, onPickupPrev }: HeaderProps = {}) {
                 <Button variant="outline" className="bg-primary hover:bg-primary/80 hidden md:flex">
                     <a href="/display" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
                         <Monitor className="h-4 w-4" />
-                        Apri Display
+                        {t("manager.openDisplay")}
                     </a>
                 </Button>
                 {session?.user && (

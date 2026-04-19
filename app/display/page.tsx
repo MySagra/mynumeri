@@ -5,6 +5,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { getWorkdayBounds, sortByDate } from "@/utils/utils";
 import { type DisplayMode, DISPLAY_MODE_KEY } from "@/components/settings/DisplayModeSettingsCard";
 import { EVENT_NAME_KEY } from "@/components/settings/GeneralSettingsCard";
+import { useTranslation } from "react-i18next";
 
 const COLS = 5;
 const ROWS = 4;
@@ -29,6 +30,7 @@ interface ReadyOrder {
 // ---------------------------------------------------------------------------
 
 function Footer({ announcement }: { announcement: string }) {
+    const { t } = useTranslation();
     const measureRef = useRef<HTMLSpanElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [shouldScroll, setShouldScroll] = useState(false);
@@ -57,7 +59,7 @@ function Footer({ announcement }: { announcement: string }) {
     return (
         <footer className="flex-shrink-0 bg-amber-400 border-t-2 border-amber-500 flex items-center overflow-hidden" style={{ height: "68px" }}>
             <span className="flex-shrink-0 ml-12 mr-6 px-4 py-1 rounded-full bg-black text-amber-400 text-sm font-black uppercase tracking-widest select-none">
-                Avviso
+                {t("display.notice")}
             </span>
             <span className="flex-shrink-0 w-px h-8 bg-black/20 mr-6" />
             <div ref={containerRef} className="flex-1 overflow-hidden">
@@ -216,14 +218,16 @@ function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, s
 // Main page
 // ---------------------------------------------------------------------------
 
-const TITLE_MAP: Record<DisplayMode, string> = {
-    ready: "Ordini Pronti",
-    preparing: "Ordini in Preparazione",
-    hybrid: "Ordini",
-};
 
 export default function Display() {
+    const { t } = useTranslation();
     const [displayMode, setDisplayMode] = useState<DisplayMode>("ready");
+
+    const TITLE_MAP: Record<DisplayMode, string> = {
+        ready: t("display.ordersReady"),
+        preparing: t("display.ordersPreparing"),
+        hybrid: t("display.orders"),
+    };
 
     // Separate order lists
     const [readyOrders, setReadyOrders] = useState<ReadyOrder[]>([]);       // COMPLETED
@@ -531,7 +535,7 @@ export default function Display() {
                             orders={prepOrders}
                             cols={HYBRID_PREP_COLS}
                             rows={HYBRID_PREP_ROWS}
-                            title="In preparazione"
+                            title={t("display.preparing")}
                             headerClass="bg-yellow-300"
                             cardBgClass="bg-yellow-100"
                             sectionId="prep"
@@ -543,7 +547,7 @@ export default function Display() {
                             orders={readyOrders}
                             cols={HYBRID_READY_COLS}
                             rows={HYBRID_READY_ROWS}
-                            title="Pronti"
+                            title={t("display.ready")}
                             headerClass="bg-green-400"
                             cardBgClass="bg-green-100"
                             sectionId="ready"
@@ -596,8 +600,8 @@ export default function Display() {
                     >
                         <p className="text-4xl font-bold text-gray-500 uppercase tracking-widest mb-6 select-none">
                             {currentFsOrder.status === "COMPLETED"
-                                ? "Ordine pronto codice:"
-                                : "Stiamo preparando l'ordine:"}
+                                ? t("display.orderReadyCode")
+                                : t("display.preparingOrderCode")}
                         </p>
                         <p
                             className="font-black text-black select-none leading-none"

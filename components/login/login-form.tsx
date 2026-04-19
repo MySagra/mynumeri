@@ -13,15 +13,17 @@ import { useForm, FormProvider } from "react-hook-form"
 import { toast } from "sonner";
 import { signIn } from "next-auth/react";
 import z from "zod"
+import { useTranslation } from "react-i18next"
 
 export function LoginForm() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
     const formSchema = z.object({
-        username: z.string().min(1, "Username obbligatorio"),
-        password: z.string().min(1, "Password obbligatoria")
+        username: z.string().min(1, t("login.usernameRequired")),
+        password: z.string().min(1, t("login.passwordRequired"))
     });
 
     const form = useForm<z.input<typeof formSchema>>({
@@ -42,17 +44,17 @@ export function LoginForm() {
             });
 
             if (result?.error) {
-                toast.error("Credenziali non valide");
+                toast.error(t("login.invalidCredentials"));
                 form.reset();
             } else if (result?.ok) {
                 // Successful login
-                toast.success("Login effettuato con successo!");
+                toast.success(t("login.loginSuccess"));
                 router.push("/manager");
                 router.refresh();
             }
         } catch (error) {
             console.error('Login error:', error);
-            toast.error("Errore durante il login");
+            toast.error(t("login.loginError"));
             form.reset();
         } finally {
             setIsLoading(false);
@@ -67,12 +69,12 @@ export function LoginForm() {
         const passwordError = (errors.password as any)?.message;
 
         if (usernameError && passwordError) {
-            toast.error(`Username e Password sono obbligatori`);
+            toast.error(t("login.bothRequired"));
             return;
         }
 
         const first = Object.values(errors)[0];
-        const message = (first as any)?.message || 'Errore di validazione';
+        const message = (first as any)?.message || t("login.validationError");
         toast.error(message);
     }
 
@@ -89,27 +91,27 @@ export function LoginForm() {
                                     className="mx-auto h-36 w-auto select-none"
                                 />
                                 <div className="flex flex-col items-center gap-2 text-center">
-                                    <h1 className="text-2xl font-bold select-none">Benvenuto!</h1>
+                                    <h1 className="text-2xl font-bold select-none">{t("login.welcome")}</h1>
                                     <p className="text-muted-foreground text-balance select-none">
-                                        Esegui il login al tuo account MyNumeri
+                                        {t("login.subtitle")}
                                     </p>
                                 </div>
                                 <Field>
-                                    <FieldLabel htmlFor="username">Username</FieldLabel>
+                                    <FieldLabel htmlFor="username">{t("login.username")}</FieldLabel>
                                     <FormField
                                         control={form.control}
                                         name="username"
                                         render={({ field }) => (
                                             <FormItem>
                                                 <FormControl>
-                                                    <Input autoComplete="off" placeholder="Username o Email" {...field} />
+                                                    <Input autoComplete="off" placeholder={t("login.usernamePlaceholder")} {...field} />
                                                 </FormControl>
                                             </FormItem>
                                         )}
                                     />
                                 </Field>
                                 <Field>
-                                    <FieldLabel htmlFor="password">Password</FieldLabel>
+                                    <FieldLabel htmlFor="password">{t("login.password")}</FieldLabel>
                                     <FormField
                                         control={form.control}
                                         name="password"
@@ -117,7 +119,7 @@ export function LoginForm() {
                                             <FormItem>
                                                 <FormControl>
                                                     <ButtonGroup className="w-full">
-                                                        <Input autoComplete="off" placeholder="La tua password" type={showPassword ? "text" : "password"} {...field} />
+                                                        <Input autoComplete="off" placeholder={t("login.passwordPlaceholder")} type={showPassword ? "text" : "password"} {...field} />
                                                         <Button
                                                             type="button"
                                                             variant="outline"
@@ -135,7 +137,7 @@ export function LoginForm() {
                                 </Field>
                                 <Field>
                                     <Button type="submit" disabled={isLoading} className="w-full select-none">
-                                        {isLoading ? "Accesso..." : "Accedi"}
+                                        {isLoading ? t("login.loggingIn") : t("login.loginBtn")}
                                     </Button>
                                 </Field>
                             </FieldGroup>

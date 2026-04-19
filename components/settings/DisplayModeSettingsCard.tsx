@@ -8,34 +8,36 @@ import { Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Label } from "../ui/label";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 export type DisplayMode = "ready" | "preparing" | "hybrid";
-
-const MODES: { value: DisplayMode; label: string; description: string }[] = [
-    {
-        value: "ready",
-        label: "Solo pronti",
-        description: "Mostra solo gli ordini pronti per il ritiro",
-    },
-    {
-        value: "preparing",
-        label: "Solo in preparazione",
-        description: "Mostra solo gli ordini attualmente in preparazione",
-    },
-    {
-        value: "hybrid",
-        label: "Vista ibrida",
-        description: "¾ della pagina per gli ordini in preparazione e ¼ per gli ordini pronti",
-    },
-];
 
 export const DISPLAY_MODE_KEY = "display-mode";
 
 export function DisplayModeSettingsCard() {
+    const { t } = useTranslation();
     const [mode, setMode] = useState<DisplayMode>("ready");
     const [savedMode, setSavedMode] = useState<DisplayMode>("ready");
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+
+    const MODES = [
+        {
+            value: "ready" as DisplayMode,
+            label: t("settings.displayModeReady"),
+            description: t("settings.displayModeReadyDesc"),
+        },
+        {
+            value: "preparing" as DisplayMode,
+            label: t("settings.displayModePrep"),
+            description: t("settings.displayModePrepDesc"),
+        },
+        {
+            value: "hybrid" as DisplayMode,
+            label: t("settings.displayModeHybrid"),
+            description: t("settings.displayModeHybridDesc"),
+        },
+    ];
 
     useEffect(() => {
         fetch("/api/display-config")
@@ -74,9 +76,9 @@ export function DisplayModeSettingsCard() {
             });
             setSavedMode(mode);
             localStorage.setItem(DISPLAY_MODE_KEY, mode);
-            toast.success("Modalità display salvata");
+            toast.success(t("settings.displayModeSaved"));
         } catch {
-            toast.error("Errore durante il salvataggio");
+            toast.error(t("settings.saveError"));
         } finally {
             setIsSaving(false);
         }
@@ -89,16 +91,16 @@ export function DisplayModeSettingsCard() {
             <CardHeader>
                 <div className="flex items-center gap-2 select-none">
                     <Monitor className="h-5 w-5 text-amber-600" />
-                    <CardTitle>Display</CardTitle>
+                    <CardTitle>{t("settings.display")}</CardTitle>
                 </div>
                 <CardDescription className="select-none">
-                    Modifica la pagina del display
+                    {t("settings.displayDesc")}
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <Label htmlFor="event-name">Modalità operativa</Label>
+                <Label htmlFor="event-name">{t("settings.operativeMode")}</Label>
                 <div className="text-sm text-muted-foreground select-none mb-2">
-                    Seleziona cosa mostrare nella pagina display pubblica
+                    {t("settings.operativeModeDesc")}
                 </div>
                 {isLoading ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -136,7 +138,7 @@ export function DisplayModeSettingsCard() {
                 )}
                 <div className="flex justify-end mt-4">
                     <Button onClick={handleSave} disabled={!hasChanges || isSaving || isLoading}>
-                        {isSaving ? "Salvataggio..." : "Salva"}
+                        {isSaving ? t("settings.saving") : t("settings.save")}
                     </Button>
                 </div>
             </CardContent>

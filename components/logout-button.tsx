@@ -5,8 +5,10 @@ import { LogOut } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { logout as logoutAction } from "@/actions/auth";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 export function LogoutButton() {
+    const { t } = useTranslation();
     const handleLogout = async () => {
         try {
             // Call backend logout to revoke refresh token
@@ -15,7 +17,7 @@ export function LogoutButton() {
             // Then sign out from NextAuth
             await signOut({ redirect: true, callbackUrl: "/" });
 
-            toast.success("Logout effettuato con successo");
+            toast.success(t("session.logoutSuccess"));
         } catch (error) {
             console.error("Logout error:", error);
             // Still try to sign out even if backend logout fails
@@ -31,7 +33,7 @@ export function LogoutButton() {
             className="gap-2"
         >
             <LogOut className="h-4 w-4" />
-            Logout
+            {t("session.logout")}
         </Button>
     );
 }

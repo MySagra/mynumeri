@@ -1,0 +1,102 @@
+export const en = {
+  translation: {
+    common: {
+      poweredBy: "Powered by"
+    },
+    login: {
+      welcome: "Welcome!",
+      subtitle: "Login to your MyNumeri account",
+      username: "Username",
+      usernamePlaceholder: "Username or Email",
+      password: "Password",
+      passwordPlaceholder: "Your password",
+      loginBtn: "Sign In",
+      loggingIn: "Signing in...",
+      usernameRequired: "Username is required",
+      passwordRequired: "Password is required",
+      bothRequired: "Username and Password are required",
+      invalidCredentials: "Invalid credentials",
+      loginSuccess: "Login successful!",
+      loginError: "Error during login",
+      validationError: "Validation error"
+    },
+    manager: {
+      preparingOrders: "Preparing orders",
+      readyOrders: "Ready orders",
+      pickedUpOrders: "Picked up orders",
+      pickedUpOrdersDesc: "List of orders already picked up by customers",
+      displayNotices: "Display Notices",
+      displayNoticesDesc: "Notices will be shown at the bottom of the display page",
+      noticesPlaceholder: "E.g. Daily promo, special hours, notices...",
+      empty: "Clear",
+      cancel: "Cancel",
+      saveNotices: "Save Notices",
+      noticeSaved: "Notice saved and sent to display",
+      noticeSaveError: "Error saving notice",
+      logoutSuccess: "Logged out successfully",
+      openDisplay: "Open Display"
+    },
+    display: {
+      notice: "Notice",
+      preparing: "Preparing",
+      ready: "Ready",
+      ordersReady: "Ready Orders",
+      ordersPreparing: "Preparing Orders",
+      orders: "Orders",
+      orderReadyCode: "Order ready code:",
+      preparingOrderCode: "We are preparing order:"
+    },
+    settings: {
+      appearance: "Appearance",
+      appearanceDesc: "Customize the application appeareance",
+      theme: "Theme",
+      themeDesc: "Choose between light and dark theme",
+      light: "Light",
+      dark: "Dark",
+      displayModeReady: "Ready only",
+      displayModeReadyDesc: "Shows only orders ready for pickup",
+      displayModePrep: "Preparing only",
+      displayModePrepDesc: "Shows only orders currently in preparation",
+      displayModeHybrid: "Hybrid view",
+      displayModeHybridDesc: "¾ of the page for preparing orders and ¼ for ready orders",
+      display: "Display",
+      displayDesc: "Edit the display page",
+      operativeMode: "Operative mode",
+      operativeModeDesc: "Select what to show on the public display page",
+      saving: "Saving...",
+      save: "Save",
+      displayModeSaved: "Display mode saved",
+      saveError: "Error during saving",
+      general: "General",
+      generalDesc: "Configure the general settings of the mynumeri interface",
+      eventName: "Festival / event name",
+      eventNameDesc: "Shown in the display header next to the title",
+      eventNamePlaceholder: "e.g. Festival 2026",
+      eventNameSaved: "Event name saved",
+      settings: "Settings",
+      backToManager: "Back to Manager"
+    },
+    session: {
+      logoutSuccess: "Logged out successfully",
+      logout: "Logout",
+      loading: "Loading...",
+      unauthenticated: "Unauthenticated",
+      loginPrompt: "Log in to see your information",
+      sessionInfo: "Session Information",
+      authenticatedUserData: "Authenticated user data",
+      username: "Username",
+      role: "Role",
+      toggleTheme: "Toggle theme"
+    },
+    userMenu: {
+      settings: "Settings",
+      lightTheme: "Light theme",
+      darkTheme: "Dark theme",
+      notices: "Display Notices",
+      logout: "Logout",
+      language: "Language",
+      italian: "Italian",
+      english: "English"
+    }
+  }
+};

@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { LoginForm } from "@/components/login/login-form";
 import { useTheme } from 'next-themes';
 import { Moon, Sun, } from 'lucide-react';
+import { useTranslation } from "react-i18next";
 
 export default function LoginPage() {
     const { theme, setTheme } = useTheme();
+    const { t } = useTranslation();
     const [mounted, setMounted] = useState(false);
 
     // Prevent hydration mismatch by only rendering theme toggle after mount
@@ -24,7 +26,7 @@ export default function LoginPage() {
 
             <div className="absolute bottom-0 text-sm text-muted-foreground select-none">
                 <Link href={"https://www.mysagra.com/"} target="_blank" rel="noopener noreferrer">
-                    {"Powered by"}
+                    {t("common.poweredBy")}
                     <Button variant={"link"} className="text-primary p-1.5">
                         {"MySagra"}
                     </Button>

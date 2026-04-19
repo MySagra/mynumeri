@@ -8,10 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Settings } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 export const EVENT_NAME_KEY = "display-event-name";
 
 export function GeneralSettingsCard() {
+    const { t } = useTranslation();
     const [eventName, setEventName] = useState("");
     const [savedEventName, setSavedEventName] = useState("");
     const [isLoading, setIsLoading] = useState(true);
@@ -53,9 +55,9 @@ export function GeneralSettingsCard() {
             });
             setSavedEventName(eventName);
             localStorage.setItem(EVENT_NAME_KEY, eventName);
-            toast.success("Nome evento salvato");
+            toast.success(t("settings.eventNameSaved"));
         } catch {
-            toast.error("Errore durante il salvataggio");
+            toast.error(t("settings.saveError"));
         } finally {
             setIsSaving(false);
         }
@@ -68,18 +70,18 @@ export function GeneralSettingsCard() {
             <CardHeader>
                 <div className="flex items-center gap-2 select-none">
                     <Settings className="h-5 w-5 text-amber-600" />
-                    <CardTitle>Generali</CardTitle>
+                    <CardTitle>{t("settings.general")}</CardTitle>
                 </div>
                 <CardDescription className="select-none">
-                    Configura le impostazioni generali dell'interfaccia di mynumeri
+                    {t("settings.generalDesc")}
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center gap-3">
                     <div className="space-y-1.5 md:flex-1">
-                        <Label htmlFor="event-name">Nome della sagra / festa</Label>
+                        <Label htmlFor="event-name">{t("settings.eventName")}</Label>
                         <div className="text-sm text-muted-foreground select-none">
-                            Viene mostrato nell'header del display accanto al titolo
+                            {t("settings.eventNameDesc")}
                         </div>
                     </div>
                     {isLoading ? (
@@ -87,7 +89,7 @@ export function GeneralSettingsCard() {
                     ) : (
                         <Input
                             id="event-name"
-                            placeholder="es. Sagra 2026"
+                            placeholder={t("settings.eventNamePlaceholder")}
                             value={eventName}
                             onChange={(e) => setEventName(e.target.value)}
                             className="w-full md:max-w-sm"
@@ -96,7 +98,7 @@ export function GeneralSettingsCard() {
                 </div>
                 <div className="flex justify-end">
                     <Button onClick={handleSave} disabled={!hasChanges || isSaving || isLoading}>
-                        {isSaving ? "Salvataggio..." : "Salva"}
+                        {isSaving ? t("settings.saving") : t("settings.save")}
                     </Button>
                 </div>
             </CardContent>
