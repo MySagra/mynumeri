@@ -11,29 +11,24 @@ function getWorkdayBounds() {
     const currentHour = now.getHours();
 
     const start = new Date(now);
-    if (currentHour < 8) {
-        // Before 8 AM, it belongs to the previous day's shift
+    if (currentHour < 7) {
         start.setDate(start.getDate() - 1);
     }
-    start.setHours(8, 0, 0, 0);
-
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    end.setHours(7, 59, 59, 999);
+    start.setHours(7, 0, 0, 0);
 
     return {
         dateFrom: start.toISOString(),
-        dateTo: end.toISOString()
+        dateTo: now.toISOString()
     };
 }
-
-const sortByTicket = (a: Order, b: Order) => a.ticketNumber - b.ticketNumber;
 
 const toOrder = (o: Order): Order => ({
     id: o.id,
     ticketNumber: o.ticketNumber,
     displayCode: o.displayCode,
     status: o.status,
+    confirmedAt: o.confirmedAt,
+    completedAt: o.completedAt,
 });
 
 export default function Manager() {
@@ -42,21 +37,38 @@ export default function Manager() {
     const [readyOrders, setReadyOrders] = useState<Order[]>([]);
     const [pickedUpOrders, setPickedUpOrders] = useState<Order[]>([]);
 
+    const fetchAllPages = async (baseParams: string): Promise<Order[]> => {
+        let page = 1;
+        let all: Order[] = [];
+        let hasNextPage = true;
+
+        while (hasNextPage) {
+            const res = await fetch(`/api/orders?limit=100&page=${page}${baseParams}`);
+            if (!res.ok) break;
+            const json = await res.json();
+            const batch: Order[] = json.data || json.orders || (Array.isArray(json) ? json : []);
+            if (Array.isArray(batch)) all = [...all, ...batch.map(toOrder)];
+            hasNextPage = (json.pagination?.currentPage ?? 0) < (json.pagination?.totalPages ?? 0);
+            page++;
+        }
+
+        return all;
+    };
+
     const fetchOrders = useCallback(async () => {
         try {
             const { dateFrom, dateTo } = getWorkdayBounds();
             const dateParams = `&dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`;
 
-            const res = await fetch(`/api/orders?limit=100${dateParams}`);
-            if (res.ok) {
-                const json = await res.json();
-                const raw: Order[] = json.data || json.orders || json || [];
-                const list = Array.isArray(raw) ? raw.map(toOrder) : [];
+            const [confirmed, ready, pickedUp] = await Promise.all([
+                fetchAllPages(`${dateParams}&status=CONFIRMED&sortBy=confirmedAt`),
+                fetchAllPages(`${dateParams}&status=COMPLETED&sortBy=completedAt`),
+                fetchAllPages(`${dateParams}&status=PICKED_UP&sortBy=completedAt`),
+            ]);
 
-                setConfirmedOrders(list.filter(o => o.status === "CONFIRMED").sort(sortByTicket));
-                setReadyOrders(list.filter(o => o.status === "COMPLETED").sort(sortByTicket));
-                setPickedUpOrders(list.filter(o => o.status === "PICKED_UP").sort(sortByTicket));
-            }
+            setConfirmedOrders(confirmed);
+            setReadyOrders(ready);
+            setPickedUpOrders(pickedUp);
         } catch (error) {
             console.error("Failed to fetch orders:", error);
         }
@@ -79,7 +91,7 @@ export default function Manager() {
                 const newOrder = toOrder(JSON.parse(event.data));
                 setConfirmedOrders(prev => {
                     if (prev.find(o => String(o.id) === String(newOrder.id))) return prev;
-                    return [...prev, newOrder].sort(sortByTicket);
+                    return [...prev, newOrder];
                 });
             } catch (err) {
                 console.error("Error parsing confirmed-order event:", err);
@@ -96,9 +108,9 @@ export default function Manager() {
                 setConfirmedOrders(prev => prev.filter(o => String(o.id) !== sid));
                 setReadyOrders(prev => prev.filter(o => String(o.id) !== sid));
                 setPickedUpOrders(prev => prev.filter(o => String(o.id) !== sid));
-                if (updated.status === 'CONFIRMED') setConfirmedOrders(prev => [...prev, updated].sort(sortByTicket));
-                if (updated.status === 'COMPLETED') setReadyOrders(prev => [...prev, updated].sort(sortByTicket));
-                if (updated.status === 'PICKED_UP') setPickedUpOrders(prev => [...prev, updated].sort(sortByTicket));
+                if (updated.status === 'CONFIRMED') setConfirmedOrders(prev => [...prev, updated]);
+                if (updated.status === 'COMPLETED') setReadyOrders(prev => [...prev, updated]);
+                if (updated.status === 'PICKED_UP') setPickedUpOrders(prev => [...prev, updated]);
             } catch (err) {
                 console.error("Error parsing order-status-update event:", err);
             }
@@ -133,25 +145,25 @@ export default function Manager() {
 
     const handleConfirmToComplete = (order: Order) => {
         setConfirmedOrders(prev => prev.filter(o => o.id !== order.id));
-        setReadyOrders(prev => [...prev, order].sort(sortByTicket));
+        setReadyOrders(prev => [...prev, order]);
         updateOrderStatus(order.id, 'COMPLETED');
     };
 
     const handleCompleteToConfirm = (order: Order) => {
         setReadyOrders(prev => prev.filter(o => o.id !== order.id));
-        setConfirmedOrders(prev => [...prev, order].sort(sortByTicket));
+        setConfirmedOrders(prev => [...prev, order]);
         updateOrderStatus(order.id, 'CONFIRMED');
     };
 
     const handleCompleteToPickup = (order: Order) => {
         setReadyOrders(prev => prev.filter(o => o.id !== order.id));
-        setPickedUpOrders(prev => [...prev, order].sort(sortByTicket));
+        setPickedUpOrders(prev => [...prev, order]);
         updateOrderStatus(order.id, 'PICKED_UP');
     };
 
     const handlePickupToComplete = (order: Order) => {
         setPickedUpOrders(prev => prev.filter(o => o.id !== order.id));
-        setReadyOrders(prev => [...prev, order].sort(sortByTicket));
+        setReadyOrders(prev => [...prev, order]);
         updateOrderStatus(order.id, 'COMPLETED');
     };
 

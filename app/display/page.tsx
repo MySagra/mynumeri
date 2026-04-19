@@ -275,6 +275,7 @@ export default function Display() {
                         setDisplayMode(storedMode);
                         displayModeRef.current = storedMode;
                     }
+                    fetchOrders();
                     return;
                 }
                 if (cfg.eventName !== undefined) setEventName(cfg.eventName);
@@ -284,6 +285,7 @@ export default function Display() {
                     displayModeRef.current = mode;
                 }
                 if (typeof cfg.announcement === "string") setAnnouncement(cfg.announcement);
+                fetchOrders();
             })
             .catch(() => {
                 const storedName = localStorage.getItem(EVENT_NAME_KEY);
@@ -293,6 +295,7 @@ export default function Display() {
                     setDisplayMode(storedMode);
                     displayModeRef.current = storedMode;
                 }
+                fetchOrders();
             });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);

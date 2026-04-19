@@ -17,7 +17,7 @@ export function PickedUpOrdersSheet({ pickedUpOrders, onPrev }: PickedUpOrdersSh
             <SheetTrigger asChild>
                 <Button variant="outline">{t("manager.pickedUpOrders")}</Button>
             </SheetTrigger>
-            <SheetContent className="w-[90vw] sm:max-w-sm">
+            <SheetContent className="w-[90vw] sm:max-w-2xl">
                 <SheetHeader>
                     <SheetTitle className="text-2xl font-bold">{t("manager.pickedUpOrders")}</SheetTitle>
                     <SheetDescription>{t("manager.pickedUpOrdersDesc")}</SheetDescription>
