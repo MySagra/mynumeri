@@ -425,6 +425,13 @@ export default function Display() {
             }
         });
 
+        es.addEventListener("order-cancelled", (event: MessageEvent) => {
+            const data = JSON.parse(event.data) as ReadyOrder;
+            const sid = String(data.id);
+            setReadyOrders((prev) => prev.filter((o) => String(o.id) !== sid));
+            setPrepOrders((prev) => prev.filter((o) => String(o.id) !== sid));
+        });
+
         return () => es.close();
     }, [fetchOrders]);
 

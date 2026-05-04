@@ -5,6 +5,7 @@ import { Header } from "@/components/manager/header";
 import OrdersGrid from "@/components/manager/orders-grid";
 import { PickedUpOrdersSheet } from "@/components/manager/picked-up-orders-sheet";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 function getWorkdayBounds() {
     const now = new Date();
@@ -113,6 +114,19 @@ export default function Manager() {
                 if (updated.status === 'PICKED_UP') setPickedUpOrders(prev => [...prev, updated]);
             } catch (err) {
                 console.error("Error parsing order-status-update event:", err);
+            }
+        });
+
+        eventSource.addEventListener('order-cancelled', (event: MessageEvent) => {
+            try {
+                const cancelled = JSON.parse(event.data);
+                const sid = String(cancelled.id);
+                setConfirmedOrders(prev => prev.filter(o => String(o.id) !== sid));
+                setReadyOrders(prev => prev.filter(o => String(o.id) !== sid));
+                setPickedUpOrders(prev => prev.filter(o => String(o.id) !== sid));
+                toast.warning(t("manager.orderCancelled", { code: cancelled.displayCode }));
+            } catch (err) {
+                console.error("Error parsing order-cancelled event:", err);
             }
         });
 

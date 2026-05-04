@@ -34,7 +34,8 @@ export const it = {
       noticeSaved: "Avviso salvato e inviato al display",
       noticeSaveError: "Errore durante il salvataggio dell'avviso",
       logoutSuccess: "Logout effettuato con successo",
-      openDisplay: "Apri Display"
+      openDisplay: "Apri Display",
+      orderCancelled: "Ordine {{code}} annullato"
     },
     display: {
       notice: "Avviso",

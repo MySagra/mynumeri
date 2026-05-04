@@ -34,7 +34,8 @@ export const en = {
       noticeSaved: "Notice saved and sent to display",
       noticeSaveError: "Error saving notice",
       logoutSuccess: "Logged out successfully",
-      openDisplay: "Open Display"
+      openDisplay: "Open Display",
+      orderCancelled: "Order {{code}} cancelled"
     },
     display: {
       notice: "Notice",
