@@ -86,7 +86,12 @@ export const en = {
       ticketNumberMaxDesc: "Enable to cap numbers from 0 to limit value (exclusive)",
       ticketNumberMaxLabel: "Limit value:",
       ticketNumberMaxPlaceholder: "e.g. 100",
-      numberDisplaySaved: "Number display setting saved"
+      numberDisplaySaved: "Number display setting saved",
+      stations: "Stations",
+      stationsDesc: "Enable pickup station management (kitchen, grill, etc.)",
+      stationsEnabled: "Enable stations",
+      stationsSaved: "Stations setting saved",
+      allOrders: "All orders"
     },
     session: {
       logoutSuccess: "Logged out successfully",

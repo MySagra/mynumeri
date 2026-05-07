@@ -8,5 +8,11 @@ type Order = {
     customer?: string;
     table?: string;
     status: `PENDING` | `CONFIRMED` | `COMPLETED` | `PICKED_UP`;
+    ordersStations?: string[];
 }
 type Status = `PENDING` | `CONFIRMED` | `COMPLETED` | `PICKED_UP`;
+
+type Station = {
+    id: string;
+    name: string;
+};

@@ -13,6 +13,7 @@ export interface DisplayConfig {
     displayMode: DisplayMode;
     numberDisplay: NumberDisplay;
     ticketNumberMax: number;
+    stationsEnabled: boolean;
 }
 
 type Subscriber = (text: string) => void;
@@ -26,6 +27,7 @@ const DEFAULT_CONFIG: DisplayConfig = {
     displayMode: "ready",
     numberDisplay: "displayCode",
     ticketNumberMax: 100,
+    stationsEnabled: false,
 };
 
 // In-memory cache — populated lazily on first read/write

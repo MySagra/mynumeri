@@ -19,6 +19,9 @@ export async function PATCH(request: Request) {
     if (typeof body.ticketNumberMax === "number" && body.ticketNumberMax >= 0) {
         patch.ticketNumberMax = Math.floor(body.ticketNumberMax);
     }
+    if (typeof body.stationsEnabled === "boolean") {
+        patch.stationsEnabled = body.stationsEnabled;
+    }
 
     const updated = updateConfig(patch);
     return Response.json(updated);
