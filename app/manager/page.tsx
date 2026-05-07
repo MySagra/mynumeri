@@ -49,6 +49,12 @@ export default function Manager() {
     const stationsRef = useRef<Station[]>([]);
     useEffect(() => { stationsRef.current = stations; }, [stations]);
 
+    // Refs to current station maps so SSE closures can look up orders by id
+    const stationConfirmedRef = useRef<Record<string, Order[]>>({});
+    const stationCompletedRef = useRef<Record<string, Order[]>>({});
+    useEffect(() => { stationConfirmedRef.current = stationConfirmed; }, [stationConfirmed]);
+    useEffect(() => { stationCompletedRef.current = stationCompleted; }, [stationCompleted]);
+
     const fetchAllPages = async (baseParams: string): Promise<Order[]> => {
         let page = 1;
         let all: Order[] = [];
@@ -103,7 +109,7 @@ export default function Manager() {
             const ready: Order[] = [];
             const pickedUp: Order[] = [];
             for (const o of orders) {
-                if (o.status === 'CONFIRMED') confirmed.push(o);
+                if (o.status === 'CONFIRMED' || o.status === 'PARTIAL') confirmed.push(o);
                 else if (o.status === 'COMPLETED') ready.push(o);
                 else if (o.status === 'PICKED_UP') pickedUp.push(o);
             }
@@ -191,38 +197,92 @@ export default function Manager() {
 
         eventSource.addEventListener('order-status-update', (event: MessageEvent) => {
             try {
-                const updated: Order = toOrder(JSON.parse(event.data));
-                const sid = String(updated.id);
+                const raw = JSON.parse(event.data);
+                const { id, status } = raw;
+                const sid = String(id);
 
                 if (stationsEnabledRef.current) {
-                    if (updated.status === 'PICKED_UP') {
-                        removeFromAllStations(sid);
-                        setPickedUpOrders(prev => prev.find(o => o.id === sid) ? prev : [...prev, updated]);
-                    } else if (updated.status === 'CONFIRMED') {
-                        // Undo: back to station confirmed for all its stations
-                        removeFromAllStations(sid);
+                    // Find order in current maps before clearing (refs still point to current state)
+                    let order: Order | undefined;
+                    for (const stId of Object.keys(stationConfirmedRef.current)) {
+                        order = stationConfirmedRef.current[stId].find(o => String(o.id) === sid);
+                        if (order) break;
+                    }
+                    if (!order) {
+                        for (const stId of Object.keys(stationCompletedRef.current)) {
+                            order = stationCompletedRef.current[stId].find(o => String(o.id) === sid);
+                            if (order) break;
+                        }
+                    }
+
+                    removeFromAllStations(sid);
+
+                    if (status === 'CONFIRMED' && order) {
+                        // Undo: put back in confirmed for every station the order belongs to
+                        const stIds = Object.keys(stationCompletedRef.current).filter(k =>
+                            stationCompletedRef.current[k].some(o => String(o.id) === sid) ||
+                            stationConfirmedRef.current[k]?.some(o => String(o.id) === sid)
+                        );
                         setStationConfirmed(prev => {
                             const next = { ...prev };
-                            for (const stId of updated.ordersStations ?? []) {
-                                if (stId in next && !next[stId].find(o => o.id === sid)) {
-                                    next[stId] = [...next[stId], updated];
-                                }
+                            for (const stId of stIds) {
+                                if (stId in next && !next[stId].find(o => String(o.id) === sid)) next[stId] = [...next[stId], order!];
                             }
                             return next;
                         });
+                    } else if (status === 'COMPLETED' && order) {
+                        const stIds = Object.keys(stationConfirmedRef.current).filter(k =>
+                            stationConfirmedRef.current[k].some(o => String(o.id) === sid)
+                        );
+                        setStationCompleted(prev => {
+                            const next = { ...prev };
+                            for (const stId of stIds) {
+                                if (stId in next && !next[stId].find(o => String(o.id) === sid)) next[stId] = [...next[stId], order!];
+                            }
+                            return next;
+                        });
+                    } else if (status === 'PICKED_UP' && order) {
+                        setPickedUpOrders(prev => prev.find(o => String(o.id) === sid) ? prev : [...prev, order!]);
                     }
-                    // COMPLETED (overall): sub-orders already handled optimistically per station
                     return;
                 }
 
+                const updated = toOrder(raw);
                 setConfirmedOrders(prev => prev.filter(o => String(o.id) !== sid));
                 setReadyOrders(prev => prev.filter(o => String(o.id) !== sid));
                 setPickedUpOrders(prev => prev.filter(o => String(o.id) !== sid));
-                if (updated.status === 'CONFIRMED') setConfirmedOrders(prev => [...prev, updated]);
+                if (updated.status === 'CONFIRMED' || updated.status === 'PARTIAL') setConfirmedOrders(prev => [...prev, updated]);
                 if (updated.status === 'COMPLETED') setReadyOrders(prev => [...prev, updated]);
                 if (updated.status === 'PICKED_UP') setPickedUpOrders(prev => [...prev, updated]);
             } catch (err) {
                 console.error("Error parsing order-status-update event:", err);
+            }
+        });
+
+        eventSource.addEventListener('order-station-status-update', (event: MessageEvent) => {
+            if (!stationsEnabledRef.current) return;
+            try {
+                const { orderId, stationId, status } = JSON.parse(event.data);
+                const sid = String(orderId);
+
+                if (status === 'COMPLETED') {
+                    const order = stationConfirmedRef.current[stationId]?.find(o => String(o.id) === sid);
+                    setStationConfirmed(prev => ({ ...prev, [stationId]: (prev[stationId] ?? []).filter(o => String(o.id) !== sid) }));
+                    if (order) setStationCompleted(prev => prev[stationId]?.find(o => String(o.id) === sid) ? prev : { ...prev, [stationId]: [...(prev[stationId] ?? []), order] });
+                } else if (status === 'CONFIRMED') {
+                    const order = stationCompletedRef.current[stationId]?.find(o => String(o.id) === sid)
+                               ?? stationConfirmedRef.current[stationId]?.find(o => String(o.id) === sid);
+                    setStationCompleted(prev => ({ ...prev, [stationId]: (prev[stationId] ?? []).filter(o => String(o.id) !== sid) }));
+                    if (order) setStationConfirmed(prev => prev[stationId]?.find(o => String(o.id) === sid) ? prev : { ...prev, [stationId]: [...(prev[stationId] ?? []), order] });
+                } else if (status === 'PICKED_UP') {
+                    const order = stationCompletedRef.current[stationId]?.find(o => String(o.id) === sid)
+                               ?? stationConfirmedRef.current[stationId]?.find(o => String(o.id) === sid);
+                    setStationConfirmed(prev => ({ ...prev, [stationId]: (prev[stationId] ?? []).filter(o => String(o.id) !== sid) }));
+                    setStationCompleted(prev => ({ ...prev, [stationId]: (prev[stationId] ?? []).filter(o => String(o.id) !== sid) }));
+                    if (order) setPickedUpOrders(prev => prev.find(o => String(o.id) === sid) ? prev : [...prev, order]);
+                }
+            } catch (err) {
+                console.error("Error parsing order-station-status-update event:", err);
             }
         });
 

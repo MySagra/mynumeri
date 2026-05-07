@@ -12,7 +12,7 @@ type Order = {
     completedAt?: string;
     customer?: string;
     table?: string;
-    status: `PENDING` | `CONFIRMED` | `COMPLETED` | `PICKED_UP`;
+    status: `PENDING` | `CONFIRMED` | `COMPLETED` | `PICKED_UP` | `PARTIAL`;
     ordersStations?: string[];
     orderStationStates?: OrderStationState[];
 }

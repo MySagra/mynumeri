@@ -28,7 +28,7 @@ const MAX_STATIONS_FOR_HYBRID = 3;
 
 interface ReadyOrder {
     id: string;
-    status: "PENDING" | "CONFIRMED" | "COMPLETED" | "PICKED_UP";
+    status: "PENDING" | "CONFIRMED" | "COMPLETED" | "PICKED_UP" | "PARTIAL";
     ticketNumber: number;
     displayCode: string;
     ordersStations?: string[];
@@ -108,7 +108,7 @@ interface DisplaySectionProps {
 function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, sectionId, immediateRemoval = false, getOrderLabel, bare = false, compact = false }: DisplaySectionProps) {
     const cardsPerPage = cols * rows;
     const [currentPage, setCurrentPage] = useState(0);
-    const [displayedOrders, setDisplayedOrders] = useState<ReadyOrder[]>(orders);
+    const [displayedOrders, setDisplayedOrders] = useState<(ReadyOrder | null)[]>(orders);
     const latestRef = useRef<ReadyOrder[]>(orders);
 
     useEffect(() => { latestRef.current = orders; }, [orders]);
@@ -117,12 +117,19 @@ function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, s
 
     useEffect(() => {
         setDisplayedOrders(prev => {
-            if (prev.length <= cardsPerPage) return orders;
+            const prevItems = prev.filter((o): o is ReadyOrder => o !== null);
+            if (prevItems.length <= cardsPerPage) return orders;
             const currentIds = new Set(orders.map(o => o.id));
-            const prevIds = new Set(prev.map(o => o.id));
+            const prevIds = new Set(prevItems.map(o => o.id));
             const newOrders = orders.filter(o => !prevIds.has(o.id));
-            const base = immediateRemoval ? prev.filter(o => currentIds.has(o.id)) : prev;
-            if (newOrders.length === 0 && base.length === prev.length) return prev;
+            if (immediateRemoval) {
+                const base = prevItems.filter(o => currentIds.has(o.id));
+                if (newOrders.length === 0 && base.length === prevItems.length) return prev;
+                return [...base, ...newOrders];
+            }
+            // Replace removed orders with null — blank slot, preserves position
+            const base = prev.map(o => (o === null || currentIds.has(o.id)) ? o : null);
+            if (newOrders.length === 0 && base.every((o, i) => o === prev[i])) return prev;
             return [...base, ...newOrders];
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -164,12 +171,14 @@ function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, s
             )}
             <div className="flex-1 p-4 overflow-hidden">
                 <div className="h-full grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }}>
-                    {pageOrders.map(order => (
+                    {pageOrders.map((order, idx) => order ? (
                         <div key={order.id} className={`${cardBgClass} border-2 border-gray-300 rounded-xl flex items-center justify-center shadow-sm`}>
                             <p className="font-black text-black select-none leading-none" style={{ fontSize: compact ? "clamp(1.25rem, 2vw, 3rem)" : "clamp(2rem, 4vw, 6rem)" }}>
                                 {getOrderLabel(order)}
                             </p>
                         </div>
+                    ) : (
+                        <div key={`blank-${idx}`} />
                     ))}
                 </div>
             </div>
@@ -278,7 +287,7 @@ export default function Display() {
 
     // Single-mode pagination
     const [currentPage, setCurrentPage] = useState(0);
-    const [displayedOrders, setDisplayedOrders] = useState<ReadyOrder[]>([]);
+    const [displayedOrders, setDisplayedOrders] = useState<(ReadyOrder | null)[]>([]);
     const latestOrdersRef = useRef<ReadyOrder[]>([]);
     const displayModeRef = useRef<DisplayMode>("ready");
 
@@ -286,6 +295,12 @@ export default function Display() {
     const [eventName, setEventName] = useState("");
 
     const stationsEnabledRef = useRef(false);
+
+    // Refs to current station maps so SSE closures can look up orders by id
+    const stationConfirmedRef = useRef<Record<string, ReadyOrder[]>>({});
+    const stationCompletedRef = useRef<Record<string, ReadyOrder[]>>({});
+    useEffect(() => { stationConfirmedRef.current = stationConfirmed; }, [stationConfirmed]);
+    useEffect(() => { stationCompletedRef.current = stationCompleted; }, [stationCompleted]);
 
     // Full-screen overlay
     const [fsQueue, setFsQueue] = useState<ReadyOrder[]>([]);
@@ -430,7 +445,7 @@ export default function Display() {
                     const sorted = orders.sort(sortByDate);
                     const toRO = (o: Order): ReadyOrder => ({ id: o.id, ticketNumber: o.ticketNumber, displayCode: o.displayCode, status: o.status });
                     if (mode === "ready" || mode === "hybrid") setReadyOrders(sorted.filter(o => o.status === 'COMPLETED').map(toRO));
-                    if (mode === "preparing" || mode === "hybrid") setPrepOrders(sorted.filter(o => o.status === 'CONFIRMED').map(toRO));
+                    if (mode === "preparing" || mode === "hybrid") setPrepOrders(sorted.filter(o => o.status === 'CONFIRMED' || o.status === 'PARTIAL').map(toRO));
                 }
             }
         } catch (err) {
@@ -489,37 +504,58 @@ export default function Display() {
         });
 
         es.addEventListener("order-status-update", (event: MessageEvent) => {
-            const data = JSON.parse(event.data) as ReadyOrder;
-            const sid = String(data.id);
+            const raw = JSON.parse(event.data);
+            const sid = String(raw.id);
             const mode = displayModeRef.current;
 
             if (stationsEnabledRef.current) {
-                if (data.status === "COMPLETED") {
-                    // All stations done — move from confirmed to completed for all stations
+                // Find order object in refs before clearing state
+                let order: ReadyOrder | undefined;
+                for (const stId of Object.keys(stationConfirmedRef.current)) {
+                    order = stationConfirmedRef.current[stId].find(o => String(o.id) === sid);
+                    if (order) break;
+                }
+                if (!order) {
+                    for (const stId of Object.keys(stationCompletedRef.current)) {
+                        order = stationCompletedRef.current[stId].find(o => String(o.id) === sid);
+                        if (order) break;
+                    }
+                }
+
+                removeFromAllStationMaps(sid);
+
+                if (raw.status === "CONFIRMED" && order) {
+                    const stIds = Object.keys(stationCompletedRef.current).filter(k =>
+                        stationCompletedRef.current[k].some(o => String(o.id) === sid) ||
+                        stationConfirmedRef.current[k]?.some(o => String(o.id) === sid)
+                    );
                     setStationConfirmed(prev => {
                         const next = { ...prev };
-                        for (const k of Object.keys(next)) next[k] = next[k].filter(o => String(o.id) !== sid);
+                        for (const stId of stIds) {
+                            if (stId in next && !next[stId].find(o => String(o.id) === sid)) next[stId] = [...next[stId], order!];
+                        }
                         return next;
                     });
-                    if (data.ordersStations && data.ordersStations.length > 0) {
-                        setStationCompleted(prev => {
-                            const next = { ...prev };
-                            for (const stId of data.ordersStations!) {
-                                const existing = next[stId] ?? [];
-                                if (!existing.find(o => String(o.id) === sid)) next[stId] = [...existing, data];
-                            }
-                            return next;
-                        });
-                    }
+                } else if (raw.status === "COMPLETED" && order) {
+                    const stIds = Object.keys(stationConfirmedRef.current).filter(k =>
+                        stationConfirmedRef.current[k].some(o => String(o.id) === sid)
+                    );
+                    setStationCompleted(prev => {
+                        const next = { ...prev };
+                        for (const stId of stIds) {
+                            if (stId in next && !next[stId].find(o => String(o.id) === sid)) next[stId] = [...next[stId], order!];
+                        }
+                        return next;
+                    });
                     if (mode === "ready" || mode === "hybrid") {
-                        setFsQueue(q => q.find(o => String(o.id) === sid) ? q : [...q, data]);
+                        if (order) setFsQueue(q => q.find(o => String(o.id) === sid) ? q : [...q, order!]);
                     }
-                } else if (data.status === "PICKED_UP") {
-                    removeFromAllStationMaps(sid);
                 }
+                // PICKED_UP: removeFromAllStationMaps already handled above
                 return;
             }
 
+            const data = raw as ReadyOrder;
             if (mode === "ready" || mode === "hybrid") {
                 if (data.status === "COMPLETED") {
                     setReadyOrders(prev => prev.find(o => String(o.id) === sid) ? prev : [...prev, data]);
@@ -529,11 +565,39 @@ export default function Display() {
                 }
             }
             if (mode === "preparing" || mode === "hybrid") {
-                if (data.status === "CONFIRMED") {
+                if (data.status === "CONFIRMED" || data.status === "PARTIAL") {
                     setPrepOrders(prev => prev.find(o => String(o.id) === sid) ? prev : [...prev, data]);
                 } else {
                     setPrepOrders(prev => prev.filter(o => String(o.id) !== sid));
                 }
+            }
+        });
+
+        es.addEventListener("order-station-status-update", (event: MessageEvent) => {
+            if (!stationsEnabledRef.current) return;
+            try {
+                const { orderId, stationId, status } = JSON.parse(event.data);
+                const sid = String(orderId);
+                const mode = displayModeRef.current;
+
+                if (status === "COMPLETED") {
+                    const order = stationConfirmedRef.current[stationId]?.find(o => String(o.id) === sid);
+                    setStationConfirmed(prev => ({ ...prev, [stationId]: (prev[stationId] ?? []).filter(o => String(o.id) !== sid) }));
+                    if (order) setStationCompleted(prev => prev[stationId]?.find(o => String(o.id) === sid) ? prev : { ...prev, [stationId]: [...(prev[stationId] ?? []), order] });
+                    if (mode === "ready" || mode === "hybrid") {
+                        if (order) setFsQueue(q => q.find(o => String(o.id) === sid) ? q : [...q, order]);
+                    }
+                } else if (status === "CONFIRMED") {
+                    const order = stationCompletedRef.current[stationId]?.find(o => String(o.id) === sid)
+                               ?? stationConfirmedRef.current[stationId]?.find(o => String(o.id) === sid);
+                    setStationCompleted(prev => ({ ...prev, [stationId]: (prev[stationId] ?? []).filter(o => String(o.id) !== sid) }));
+                    if (order) setStationConfirmed(prev => prev[stationId]?.find(o => String(o.id) === sid) ? prev : { ...prev, [stationId]: [...(prev[stationId] ?? []), order] });
+                } else if (status === "PICKED_UP") {
+                    setStationConfirmed(prev => ({ ...prev, [stationId]: (prev[stationId] ?? []).filter(o => String(o.id) !== sid) }));
+                    setStationCompleted(prev => ({ ...prev, [stationId]: (prev[stationId] ?? []).filter(o => String(o.id) !== sid) }));
+                }
+            } catch (err) {
+                console.error("Error parsing order-station-status-update event:", err);
             }
         });
 
@@ -596,11 +660,14 @@ export default function Display() {
     useEffect(() => {
         if (displayMode === "hybrid" || stationsEnabled) return;
         setDisplayedOrders(prev => {
-            if (prev.length <= CARDS_PER_PAGE) return activeOrders;
-            const prevIds = new Set(prev.map(o => o.id));
+            const prevItems = prev.filter((o): o is ReadyOrder => o !== null);
+            if (prevItems.length <= CARDS_PER_PAGE) return activeOrders;
+            const currentIds = new Set(activeOrders.map(o => o.id));
+            const prevIds = new Set(prevItems.map(o => o.id));
             const newOrders = activeOrders.filter(o => !prevIds.has(o.id));
-            if (newOrders.length === 0) return prev;
-            return [...prev, ...newOrders];
+            const base = prev.map(o => (o === null || currentIds.has(o.id)) ? o : null);
+            if (newOrders.length === 0 && base.every((o, i) => o === prev[i])) return prev;
+            return [...base, ...newOrders];
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeOrders, displayMode]);
@@ -741,12 +808,14 @@ export default function Display() {
             ) : (
                 <main className="flex-1 overflow-hidden p-4">
                     <div className="h-full grid gap-3" style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)`, gridTemplateRows: `repeat(${ROWS}, 1fr)` }}>
-                        {pageOrders.map(order => (
+                        {pageOrders.map((order, idx) => order ? (
                             <div key={order.id} className="order-card bg-white border-2 border-gray-200 rounded-2xl flex items-center justify-center shadow-sm">
                                 <p className="font-black text-black select-none leading-none" style={{ fontSize: "clamp(3rem, 6vw, 9rem)" }}>
                                     {getOrderLabel(order)}
                                 </p>
                             </div>
+                        ) : (
+                            <div key={`blank-${idx}`} />
                         ))}
                     </div>
                 </main>
