@@ -64,7 +64,7 @@ export function StationCard({
                     <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide select-none">
                         {t("manager.readyOrders")}
                     </span>
-                    <PickedUpOrdersSheet pickedUpOrders={pickedUpOrders} onPrev={onPickupPrev} />
+                    <PickedUpOrdersSheet pickedUpOrders={pickedUpOrders} onPrev={onPickupPrev} stationName={stationName} />
                 </div>
                 <div className="flex-1 overflow-y-auto px-4 pb-4">
                     <div className="flex gap-3 flex-wrap items-start place-content-start">

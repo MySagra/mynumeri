@@ -65,22 +65,6 @@ export default function Manager() {
         return all;
     };
 
-    const buildStationMaps = (orders: Order[], stList: Station[]): { confirmed: Record<string, Order[]>; completed: Record<string, Order[]> } => {
-        const confirmed: Record<string, Order[]> = {};
-        const completed: Record<string, Order[]> = {};
-        for (const s of stList) { confirmed[s.id] = []; completed[s.id] = []; }
-        for (const o of orders) {
-            for (const state of o.orderStationStates ?? []) {
-                if (state.status === 'CONFIRMED' && state.stationId in confirmed && !confirmed[state.stationId].find(x => x.id === o.id)) {
-                    confirmed[state.stationId].push(o);
-                } else if (state.status === 'COMPLETED' && state.stationId in completed && !completed[state.stationId].find(x => x.id === o.id)) {
-                    completed[state.stationId].push(o);
-                }
-            }
-        }
-        return { confirmed, completed };
-    };
-
     const fetchOrders = useCallback(async () => {
         try {
             const { dateFrom, dateTo } = getWorkdayBounds();
@@ -88,24 +72,41 @@ export default function Manager() {
 
             if (stationsEnabledRef.current) {
                 const stList = stationsRef.current;
-                const includeParam = '&include=ordersStationsStates';
-                const [stConfirmed, stCompleted, pickedUp] = await Promise.all([
-                    fetchAllPages(`${dateParams}&status=CONFIRMED&sortBy=confirmedAt${includeParam}`),
-                    fetchAllPages(`${dateParams}&status=COMPLETED&sortBy=completedAt${includeParam}`),
-                    fetchAllPages(`${dateParams}&status=PICKED_UP&sortBy=completedAt`),
-                ]);
-                const { confirmed: confirmedMap, completed: completedMap } = buildStationMaps([...stConfirmed, ...stCompleted], stList);
+                const orders = await fetchAllPages(`${dateParams}&include=ordersStationsStates`);
+
+                const confirmedMap: Record<string, Order[]> = {};
+                const completedMap: Record<string, Order[]> = {};
+                const pickedUp: Order[] = [];
+                for (const s of stList) { confirmedMap[s.id] = []; completedMap[s.id] = []; }
+
+                for (const o of orders) {
+                    if (o.status === 'PICKED_UP') {
+                        pickedUp.push(o);
+                    } else {
+                        for (const state of o.orderStationStates ?? []) {
+                            if (state.status === 'CONFIRMED' && state.stationId in confirmedMap && !confirmedMap[state.stationId].find(x => x.id === o.id)) {
+                                confirmedMap[state.stationId].push(o);
+                            } else if (state.status === 'COMPLETED' && state.stationId in completedMap && !completedMap[state.stationId].find(x => x.id === o.id)) {
+                                completedMap[state.stationId].push(o);
+                            }
+                        }
+                    }
+                }
                 setStationConfirmed(confirmedMap);
                 setStationCompleted(completedMap);
                 setPickedUpOrders(pickedUp);
                 return;
             }
 
-            const [confirmed, ready, pickedUp] = await Promise.all([
-                fetchAllPages(`${dateParams}&status=CONFIRMED&sortBy=confirmedAt`),
-                fetchAllPages(`${dateParams}&status=COMPLETED&sortBy=completedAt`),
-                fetchAllPages(`${dateParams}&status=PICKED_UP&sortBy=completedAt`),
-            ]);
+            const orders = await fetchAllPages(dateParams);
+            const confirmed: Order[] = [];
+            const ready: Order[] = [];
+            const pickedUp: Order[] = [];
+            for (const o of orders) {
+                if (o.status === 'CONFIRMED') confirmed.push(o);
+                else if (o.status === 'COMPLETED') ready.push(o);
+                else if (o.status === 'PICKED_UP') pickedUp.push(o);
+            }
             setConfirmedOrders(confirmed);
             setReadyOrders(ready);
             setPickedUpOrders(pickedUp);
@@ -135,6 +136,7 @@ export default function Manager() {
                     for (const s of data) empty[s.id] = [];
                     setStationConfirmed({ ...empty });
                     setStationCompleted({ ...empty });
+                    fetchOrders();
                 }
             })
             .catch(console.error);
@@ -274,14 +276,14 @@ export default function Manager() {
         updateOrderStatus(order.id, 'CONFIRMED', stationId);
     };
 
-    const handleStationMarkPickup = (order: Order) => {
+    const handleStationMarkPickup = (order: Order, stationId: string) => {
         setStationCompleted(prev => {
             const next = { ...prev };
             for (const k of Object.keys(next)) next[k] = next[k].filter(o => o.id !== order.id);
             return next;
         });
         setPickedUpOrders(prev => [...prev, order]);
-        updateOrderStatus(order.id, 'PICKED_UP');
+        updateOrderStatus(order.id, 'PICKED_UP', stationId);
     };
 
     const handlePickupToCompleteStation = (order: Order) => {
@@ -337,10 +339,13 @@ export default function Manager() {
                                 stationName={station.name}
                                 confirmedOrders={stationConfirmed[station.id] ?? []}
                                 completedOrders={stationCompleted[station.id] ?? []}
-                                pickedUpOrders={pickedUpOrders.filter(o => o.ordersStations?.includes(station.id))}
+                                pickedUpOrders={pickedUpOrders.filter(o =>
+                                    o.orderStationStates?.some(s => s.stationId === station.id) ??
+                                    o.ordersStations?.includes(station.id)
+                                )}
                                 onConfirmedNext={order => handleStationMarkDone(order, station.id)}
                                 onCompletedPrev={order => handleStationMarkUndo(order, station.id)}
-                                onCompletedNext={order => handleStationMarkPickup(order)}
+                                onCompletedNext={order => handleStationMarkPickup(order, station.id)}
                                 onPickupPrev={handlePickupToCompleteStation}
                             />
                         ))}

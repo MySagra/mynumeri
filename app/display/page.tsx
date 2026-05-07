@@ -101,11 +101,11 @@ interface DisplaySectionProps {
     sectionId: string;
     immediateRemoval?: boolean;
     getOrderLabel: (order: ReadyOrder) => string;
-    /** When true, renders without the outer card wrapper (for embedding inside SplitDisplaySection) */
     bare?: boolean;
+    compact?: boolean;
 }
 
-function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, sectionId, immediateRemoval = false, getOrderLabel, bare = false }: DisplaySectionProps) {
+function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, sectionId, immediateRemoval = false, getOrderLabel, bare = false, compact = false }: DisplaySectionProps) {
     const cardsPerPage = cols * rows;
     const [currentPage, setCurrentPage] = useState(0);
     const [displayedOrders, setDisplayedOrders] = useState<ReadyOrder[]>(orders);
@@ -166,7 +166,7 @@ function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, s
                 <div className="h-full grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }}>
                     {pageOrders.map(order => (
                         <div key={order.id} className={`${cardBgClass} border-2 border-gray-300 rounded-xl flex items-center justify-center shadow-sm`}>
-                            <p className="font-black text-black select-none leading-none" style={{ fontSize: "clamp(2rem, 4vw, 6rem)" }}>
+                            <p className="font-black text-black select-none leading-none" style={{ fontSize: compact ? "clamp(1.25rem, 2vw, 3rem)" : "clamp(2rem, 4vw, 6rem)" }}>
                                 {getOrderLabel(order)}
                             </p>
                         </div>
@@ -196,7 +196,8 @@ interface SplitDisplaySectionProps {
     bottomCardBgClass: string;
     sectionId: string;
     cols: number;
-    rows: number;
+    topRows: number;
+    bottomRows: number;
     getOrderLabel: (order: ReadyOrder) => string;
 }
 
@@ -206,7 +207,7 @@ function SplitDisplaySection({
     topTitle, bottomTitle,
     topHeaderClass, bottomHeaderClass,
     topCardBgClass, bottomCardBgClass,
-    sectionId, cols, rows, getOrderLabel,
+    sectionId, cols, topRows, bottomRows, getOrderLabel,
 }: SplitDisplaySectionProps) {
     return (
         <div className="flex flex-col h-full rounded-xl overflow-hidden border-2 border-gray-200 bg-white shadow-sm">
@@ -214,32 +215,34 @@ function SplitDisplaySection({
             <div className="shrink-0 flex items-center px-5 bg-white" style={{ minHeight: "56px" }}>
                 <h2 className="text-2xl font-black text-black select-none tracking-tight">{stationName}</h2>
             </div>
-            {/* Top half: preparing */}
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden border-t border-gray-200">
+            {/* Top 1/3: preparing */}
+            <div className="min-h-0 flex flex-col overflow-hidden border-t border-gray-200" style={{ flex: 1 }}>
                 <DisplaySection
                     orders={topOrders}
                     cols={cols}
-                    rows={rows}
+                    rows={topRows}
                     title={topTitle}
                     headerClass={topHeaderClass}
                     cardBgClass={topCardBgClass}
                     sectionId={`${sectionId}-top`}
                     immediateRemoval
                     bare
+                    compact
                     getOrderLabel={getOrderLabel}
                 />
             </div>
-            {/* Bottom half: ready */}
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden border-t-2 border-gray-200">
+            {/* Bottom 2/3: ready */}
+            <div className="min-h-0 flex flex-col overflow-hidden border-t-2 border-gray-200" style={{ flex: 2 }}>
                 <DisplaySection
                     orders={bottomOrders}
                     cols={cols}
-                    rows={rows}
+                    rows={bottomRows}
                     title={bottomTitle}
                     headerClass={bottomHeaderClass}
                     cardBgClass={bottomCardBgClass}
                     sectionId={`${sectionId}-bottom`}
                     bare
+                    compact
                     getOrderLabel={getOrderLabel}
                 />
             </div>
@@ -342,11 +345,13 @@ export default function Display() {
                                 for (const s of data) empty[s.id] = [];
                                 setStationConfirmed({ ...empty });
                                 setStationCompleted({ ...empty });
+                                fetchOrders();
                             }
                         })
                         .catch(console.error);
+                } else {
+                    fetchOrders();
                 }
-                fetchOrders();
             })
             .catch(() => {
                 const storedName = localStorage.getItem(EVENT_NAME_KEY);
@@ -391,66 +396,41 @@ export default function Display() {
             const mode = displayModeRef.current;
 
             if (stationsEnabledRef.current) {
-                const includeParam = '&include=ordersStationsStates';
-                const [confirmedRes, completedRes] = await Promise.all([
-                    fetch(`/api/orders?status=CONFIRMED&limit=100${dateParams}${includeParam}`),
-                    fetch(`/api/orders?status=COMPLETED&limit=100${dateParams}${includeParam}`),
-                ]);
+                const res = await fetch(`/api/orders?limit=100${dateParams}&include=ordersStationsStates`);
+                if (!res.ok) return;
+                const json = await res.json();
+                const orders: Order[] = json.data || json.orders || (Array.isArray(json) ? json : []);
+                if (!Array.isArray(orders)) return;
 
-                const toReadyOrder = (o: Order): ReadyOrder => ({
-                    id: o.id, ticketNumber: o.ticketNumber, displayCode: o.displayCode,
-                    status: o.status, ordersStations: o.ordersStations, orderStationStates: o.orderStationStates,
-                });
-
-                const buildMaps = (orders: Order[]): { confirmed: Record<string, ReadyOrder[]>; completed: Record<string, ReadyOrder[]> } => {
-                    const confirmedMap: Record<string, ReadyOrder[]> = {};
-                    const completedMap: Record<string, ReadyOrder[]> = {};
-                    for (const o of orders) {
-                        const ro = toReadyOrder(o);
-                        for (const state of o.orderStationStates ?? []) {
-                            if (state.status === 'CONFIRMED') {
-                                if (!(state.stationId in confirmedMap)) confirmedMap[state.stationId] = [];
-                                if (!confirmedMap[state.stationId].find(x => x.id === o.id)) confirmedMap[state.stationId].push(ro);
-                            } else if (state.status === 'COMPLETED') {
-                                if (!(state.stationId in completedMap)) completedMap[state.stationId] = [];
-                                if (!completedMap[state.stationId].find(x => x.id === o.id)) completedMap[state.stationId].push(ro);
-                            }
+                const confirmedMap: Record<string, ReadyOrder[]> = {};
+                const completedMap: Record<string, ReadyOrder[]> = {};
+                for (const o of orders) {
+                    if (o.status === 'PICKED_UP') continue;
+                    const ro: ReadyOrder = { id: o.id, ticketNumber: o.ticketNumber, displayCode: o.displayCode, status: o.status, ordersStations: o.ordersStations, orderStationStates: o.orderStationStates };
+                    for (const state of o.orderStationStates ?? []) {
+                        if (state.status === 'CONFIRMED') {
+                            if (!(state.stationId in confirmedMap)) confirmedMap[state.stationId] = [];
+                            if (!confirmedMap[state.stationId].find(x => x.id === o.id)) confirmedMap[state.stationId].push(ro);
+                        } else if (state.status === 'COMPLETED') {
+                            if (!(state.stationId in completedMap)) completedMap[state.stationId] = [];
+                            if (!completedMap[state.stationId].find(x => x.id === o.id)) completedMap[state.stationId].push(ro);
                         }
                     }
-                    return { confirmed: confirmedMap, completed: completedMap };
-                };
-
-                const allOrders: Order[] = [];
-                if (confirmedRes.ok) {
-                    const json = await confirmedRes.json();
-                    const orders: Order[] = json.data || json.orders || json || [];
-                    if (Array.isArray(orders)) allOrders.push(...orders);
                 }
-                if (completedRes.ok) {
-                    const json = await completedRes.json();
-                    const orders: Order[] = json.data || json.orders || json || [];
-                    if (Array.isArray(orders)) allOrders.push(...orders);
-                }
-                const { confirmed, completed } = buildMaps(allOrders);
-                setStationConfirmed(prev => ({ ...prev, ...confirmed }));
-                setStationCompleted(prev => ({ ...prev, ...completed }));
+                setStationConfirmed(prev => ({ ...prev, ...confirmedMap }));
+                setStationCompleted(prev => ({ ...prev, ...completedMap }));
                 return;
             }
 
-            if (mode === "ready" || mode === "hybrid") {
-                const res = await fetch(`/api/orders?status=COMPLETED&limit=100${dateParams}`);
-                if (res.ok) {
-                    const json = await res.json();
-                    const orders: Order[] = json.data || json.orders || json || [];
-                    setReadyOrders(Array.isArray(orders) ? orders.sort(sortByDate).map(({ id, ticketNumber, displayCode, status }) => ({ id, ticketNumber, displayCode, status })) : []);
-                }
-            }
-            if (mode === "preparing" || mode === "hybrid") {
-                const res = await fetch(`/api/orders?status=CONFIRMED&limit=100${dateParams}`);
-                if (res.ok) {
-                    const json = await res.json();
-                    const orders: Order[] = json.data || json.orders || json || [];
-                    setPrepOrders(Array.isArray(orders) ? orders.sort(sortByDate).map(({ id, ticketNumber, displayCode, status }) => ({ id, ticketNumber, displayCode, status })) : []);
+            const res = await fetch(`/api/orders?limit=100${dateParams}`);
+            if (res.ok) {
+                const json = await res.json();
+                const orders: Order[] = json.data || json.orders || (Array.isArray(json) ? json : []);
+                if (Array.isArray(orders)) {
+                    const sorted = orders.sort(sortByDate);
+                    const toRO = (o: Order): ReadyOrder => ({ id: o.id, ticketNumber: o.ticketNumber, displayCode: o.displayCode, status: o.status });
+                    if (mode === "ready" || mode === "hybrid") setReadyOrders(sorted.filter(o => o.status === 'COMPLETED').map(toRO));
+                    if (mode === "preparing" || mode === "hybrid") setPrepOrders(sorted.filter(o => o.status === 'CONFIRMED').map(toRO));
                 }
             }
         } catch (err) {
@@ -678,7 +658,8 @@ export default function Display() {
                                 bottomCardBgClass="bg-green-100"
                                 sectionId={`st-${idx}`}
                                 cols={STATION_COLS}
-                                rows={STATION_HYBRID_ROWS}
+                                topRows={1}
+                                bottomRows={STATION_HYBRID_ROWS}
                                 getOrderLabel={getOrderLabel}
                             />
                         </div>
@@ -737,6 +718,7 @@ export default function Display() {
                             cardBgClass="bg-yellow-100"
                             sectionId="prep"
                             immediateRemoval
+                            compact
                             getOrderLabel={getOrderLabel}
                         />
                     </div>
@@ -749,6 +731,7 @@ export default function Display() {
                             headerClass="bg-green-400"
                             cardBgClass="bg-green-100"
                             sectionId="ready"
+                            compact
                             getOrderLabel={getOrderLabel}
                         />
                     </div>
