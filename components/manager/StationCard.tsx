@@ -48,8 +48,8 @@ export function StationCard({
                 </div>
                 <div className="flex-1 overflow-y-auto px-4 pb-4">
                     <div className="flex gap-3 flex-wrap items-start place-content-start">
-                        {confirmedOrders.map(order => (
-                            <div key={`${order.id}-${stationId}`} className="min-w-max">
+                        {[...confirmedOrders].sort((a, b) => a.ticketNumber - b.ticketNumber).map(order => (
+                            <div key={`${order.id}-${stationId}`} className="min-w-28">
                                 <OrderCard order={order} status="CONFIRMED" onNext={onConfirmedNext} />
                             </div>
                         ))}
@@ -70,8 +70,8 @@ export function StationCard({
                 </div>
                 <div className="flex-1 overflow-y-auto px-4 pb-4">
                     <div className="flex gap-3 flex-wrap items-start place-content-start">
-                        {completedOrders.map(order => (
-                            <div key={`${order.id}-${stationId}`} className="min-w-max">
+                        {[...completedOrders].sort((a, b) => a.ticketNumber - b.ticketNumber).map(order => (
+                            <div key={`${order.id}-${stationId}`} className="min-w-20">
                                 <OrderCard order={order} status="COMPLETED" onPrev={onCompletedPrev} onNext={onCompletedNext} />
                             </div>
                         ))}

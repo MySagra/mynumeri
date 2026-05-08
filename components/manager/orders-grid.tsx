@@ -18,6 +18,8 @@ interface OrdersGridProps {
 }
 
 export default function OrdersGrid({ className, orders, title, status, stationId, onPrev, onNext, children }: OrdersGridProps) {
+    const sortedOrders = [...orders].sort((a, b) => a.ticketNumber - b.ticketNumber);
+
     return (
         <div className={cn("select-none h-full w-full rounded-xl outline-2 outline-secondary bg-card shadow-lg overflow-hidden flex flex-col", className)}>
             <div className="flex-1 overflow-y-auto px-4 pb-4">
@@ -34,8 +36,8 @@ export default function OrdersGrid({ className, orders, title, status, stationId
                 }
                 <div className="flex gap-3 flex-wrap items-start place-content-start">
                     {
-                        orders.map((order) => (
-                            <div key={stationId ? `${order.id}-${stationId}` : order.id} className="min-w-max">
+                        sortedOrders.map((order) => (
+                            <div key={stationId ? `${order.id}-${stationId}` : order.id} className="w-40">
                                 <OrderCard order={order} status={status} onPrev={onPrev} onNext={onNext} />
                             </div>
                         ))
@@ -54,7 +56,10 @@ interface OrderCardProps {
 }
 
 export function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
-    const [numberDisplay, setNumberDisplay] = useState<NumberDisplay>("displayCode");
+    const [numberDisplay, setNumberDisplay] = useState<NumberDisplay>(() => {
+        const stored = localStorage.getItem(NUMBER_DISPLAY_KEY) as NumberDisplay | null;
+        return (stored && ["displayCode", "ticketNumber"].includes(stored)) ? stored : "displayCode";
+    });
     const [ticketNumberMax, setTicketNumberMax] = useState<number>(0);
 
     useEffect(() => {
@@ -77,7 +82,7 @@ export function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
     }
 
     const orderTitle = (() => {
-        if (numberDisplay !== "ticketNumber") return order.displayCode;
+        if (numberDisplay == "displayCode") return order.displayCode;
         // 0 = no max, show raw ticketNumber
         if (!ticketNumberMax) return String(order.ticketNumber);
         return String(order.ticketNumber % ticketNumberMax);
@@ -89,7 +94,7 @@ export function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
                 variant="outline"
                 size="lg"
                 onClick={addNext}
-                className="select-none h-16 px-4 text-3xl font-bold font-mono whitespace-nowrap hover:bg-primary hover:text-primary-foreground transition-colors"
+                className="w-full select-none h-16 px-4 text-3xl font-bold font-mono whitespace-nowrap hover:bg-primary transition-colors"
                 disabled={!onNext}
             >
                 {orderTitle}
@@ -99,7 +104,7 @@ export function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
 
     if (status === 'COMPLETED') {
         return (
-            <div className="flex h-16 rounded-md overflow-hidden shadow-sm border border-input dark:border-input">
+            <div className="w-full flex h-16 rounded-md overflow-hidden shadow-sm border border-input dark:border-input">
                 <Button
                     variant="ghost"
                     className="select-none h-full w-12 shrink-0 rounded-none border-r border-input dark:border-input hover:bg-red-500 hover:text-white dark:hover:bg-red-600 transition-colors"
@@ -111,7 +116,7 @@ export function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
                 <Button
                     variant="ghost"
                     onClick={addNext}
-                    className="select-none h-full px-4 rounded-none text-3xl font-bold font-mono whitespace-nowrap bg-green-500 text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 transition-colors"
+                    className="min-w-28 select-none h-full px-4 rounded-none text-3xl font-bold font-mono whitespace-nowrap bg-green-500 text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 transition-colors"
                     disabled={!onNext}
                 >
                     {orderTitle}
@@ -124,16 +129,14 @@ export function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
         return (
             <div className="flex h-16 rounded-md overflow-hidden shadow-sm border border-input dark:border-input">
                 <Button
-                    variant="ghost"
+                    variant="outline"
                     className="select-none h-full w-12 shrink-0 rounded-none border-r border-input dark:border-input hover:bg-red-500 hover:text-white dark:hover:bg-red-600 transition-colors"
                     onClick={undoPrev}
-                    disabled={!onPrev}
                 >
                     <Undo2 className="h-5 w-5" />
                 </Button>
                 <Button
-                    variant="ghost"
-                    className="select-none h-full px-4 rounded-none text-3xl font-bold font-mono whitespace-nowrap bg-green-500 text-white dark:bg-green-600 transition-colors opacity-70 cursor-not-allowed"
+                    className="min-w-28 h-full px-4 rounded-none text-3xl font-bold font-mono whitespace-nowrap bg-blue-400 hover:bg-blue-500 text-white"
                     disabled
                 >
                     {orderTitle}
@@ -146,8 +149,8 @@ export function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
         <Card
             key={order.id}
         >
-            <CardContent className="p-4 flex items-center justify-center h-full">
-                <p className="text-8xl font-bold font-mono m-0">{orderTitle}</p>
+            <CardContent className="p-4 flex items-center justify-center h-16">
+                <p className="text-3xl font-bold font-mono m-0">{orderTitle}</p>
             </CardContent>
         </Card>
     )
