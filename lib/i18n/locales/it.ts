@@ -44,6 +44,7 @@ export const it = {
       ordersReady: "Ordini Pronti",
       ordersPreparing: "Ordini in Preparazione",
       orders: "Ordini",
+      orderReady: "Ordine pronto",
       orderReadyCode: "Ordine pronto codice:",
       preparingOrderCode: "Stiamo preparando l'ordine:"
     },
@@ -86,7 +87,14 @@ export const it = {
       ticketNumberMaxDesc: "Attiva per limitare i numeri mostrati che vanno da 0 al numero limite (escluso)",
       ticketNumberMaxLabel: "Valore limite:",
       ticketNumberMaxPlaceholder: "es. 100",
-      numberDisplaySaved: "Impostazione visualizzazione salvata"
+      numberDisplaySaved: "Impostazione visualizzazione salvata",
+      stations: "Postazioni",
+      stationsDesc: "Abilita la gestione delle postazioni di ritiro (cucina, griglia, ecc.)",
+      stationsEnabled: "Abilita postazioni",
+      stationsSaved: "Impostazione postazioni salvata",
+      fullscreenAlertEnabled: "Alert a tutto schermo",
+      fullscreenAlertEnabledDesc: "Mostra un overlay a tutto schermo quando un ordine è pronto",
+      allOrders: "Tutti gli ordini"
     },
     session: {
       logoutSuccess: "Logout effettuato con successo",

@@ -12,11 +12,12 @@ interface OrdersGridProps {
     title?: string;
     children?: React.ReactNode;
     status?: Status;
+    stationId?: string;
     onPrev?: (order: Order) => void;
     onNext?: (order: Order) => void;
 }
 
-export default function OrdersGrid({ className, orders, title, status, onPrev, onNext, children }: OrdersGridProps) {
+export default function OrdersGrid({ className, orders, title, status, stationId, onPrev, onNext, children }: OrdersGridProps) {
     return (
         <div className={cn("select-none h-full w-full rounded-xl outline-2 outline-secondary bg-card shadow-lg overflow-hidden flex flex-col", className)}>
             <div className="flex-1 overflow-y-auto px-4 pb-4">
@@ -34,7 +35,7 @@ export default function OrdersGrid({ className, orders, title, status, onPrev, o
                 <div className="flex gap-3 flex-wrap items-start place-content-start">
                     {
                         orders.map((order) => (
-                            <div key={order.id} className="min-w-max">
+                            <div key={stationId ? `${order.id}-${stationId}` : order.id} className="min-w-max">
                                 <OrderCard order={order} status={status} onPrev={onPrev} onNext={onNext} />
                             </div>
                         ))
@@ -52,7 +53,7 @@ interface OrderCardProps {
     onNext?: (order: Order) => void;
 }
 
-function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
+export function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
     const [numberDisplay, setNumberDisplay] = useState<NumberDisplay>("displayCode");
     const [ticketNumberMax, setTicketNumberMax] = useState<number>(0);
 
@@ -88,7 +89,7 @@ function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
                 variant="outline"
                 size="lg"
                 onClick={addNext}
-                className="select-none h-16 px-4 text-3xl font-bold whitespace-nowrap hover:bg-primary hover:text-primary-foreground transition-colors"
+                className="select-none h-16 px-4 text-3xl font-bold font-mono whitespace-nowrap hover:bg-primary hover:text-primary-foreground transition-colors"
                 disabled={!onNext}
             >
                 {orderTitle}
@@ -110,7 +111,7 @@ function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
                 <Button
                     variant="ghost"
                     onClick={addNext}
-                    className="select-none h-full px-4 rounded-none text-3xl font-bold whitespace-nowrap bg-green-500 text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 transition-colors"
+                    className="select-none h-full px-4 rounded-none text-3xl font-bold font-mono whitespace-nowrap bg-green-500 text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 transition-colors"
                     disabled={!onNext}
                 >
                     {orderTitle}
@@ -132,7 +133,7 @@ function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
                 </Button>
                 <Button
                     variant="ghost"
-                    className="select-none h-full px-4 rounded-none text-3xl font-bold whitespace-nowrap bg-green-500 text-white dark:bg-green-600 transition-colors opacity-70 cursor-not-allowed"
+                    className="select-none h-full px-4 rounded-none text-3xl font-bold font-mono whitespace-nowrap bg-green-500 text-white dark:bg-green-600 transition-colors opacity-70 cursor-not-allowed"
                     disabled
                 >
                     {orderTitle}
@@ -146,7 +147,7 @@ function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
             key={order.id}
         >
             <CardContent className="p-4 flex items-center justify-center h-full">
-                <p className="text-8xl font-bold m-0">{orderTitle}</p>
+                <p className="text-8xl font-bold font-mono m-0">{orderTitle}</p>
             </CardContent>
         </Card>
     )

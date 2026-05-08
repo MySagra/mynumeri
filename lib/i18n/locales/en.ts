@@ -44,6 +44,7 @@ export const en = {
       ordersReady: "Ready Orders",
       ordersPreparing: "Preparing Orders",
       orders: "Orders",
+      orderReady: "Order ready",
       orderReadyCode: "Order ready code:",
       preparingOrderCode: "We are preparing order:"
     },
@@ -86,7 +87,14 @@ export const en = {
       ticketNumberMaxDesc: "Enable to cap numbers from 0 to limit value (exclusive)",
       ticketNumberMaxLabel: "Limit value:",
       ticketNumberMaxPlaceholder: "e.g. 100",
-      numberDisplaySaved: "Number display setting saved"
+      numberDisplaySaved: "Number display setting saved",
+      stations: "Stations",
+      stationsDesc: "Enable pickup station management (kitchen, grill, etc.)",
+      stationsEnabled: "Enable stations",
+      stationsSaved: "Stations setting saved",
+      fullscreenAlertEnabled: "Full-screen alert",
+      fullscreenAlertEnabledDesc: "Show a full-screen overlay when an order is ready",
+      allOrders: "All orders"
     },
     session: {
       logoutSuccess: "Logged out successfully",

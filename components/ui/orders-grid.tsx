@@ -78,7 +78,7 @@ function OrderCard({ order, status, prevSetter, actualSetter, nextSetter }: Orde
                 variant="outline"
                 size="lg"
                 onClick={addNext}
-                className="h-15 text-3xl font-bold hover:bg-primary hover:text-primary-foreground transition-colors"
+                className="h-15 text-3xl font-bold font-mono hover:bg-primary hover:text-primary-foreground transition-colors"
             >
                 {order.ticketNumber}
             </Button>
@@ -98,7 +98,7 @@ function OrderCard({ order, status, prevSetter, actualSetter, nextSetter }: Orde
                 <Button
                     variant="outline"
                     onClick={addNext}
-                    className="h-15 text-3xl font-bold bg-green-500 hover:bg-green-600 transition-colors"
+                    className="h-15 text-3xl font-bold font-mono bg-green-500 hover:bg-green-600 transition-colors"
                     disabled={!nextSetter}
                 >
                     {order.ticketNumber}
@@ -121,7 +121,7 @@ function OrderCard({ order, status, prevSetter, actualSetter, nextSetter }: Orde
                 <Button
                     variant="outline"
                     onClick={addNext}
-                    className="h-15 text-3xl font-bold bg-green-500 transition-colors"
+                    className="h-15 text-3xl font-bold font-mono bg-green-500 transition-colors"
                     disabled={!nextSetter}
                 >
                     {order.ticketNumber}
@@ -135,7 +135,7 @@ function OrderCard({ order, status, prevSetter, actualSetter, nextSetter }: Orde
         <Card
             key={order.id}
         >
-            <CardContent><p className="text-8xl font-bold">{order.ticketNumber}</p></CardContent>
+            <CardContent><p className="text-8xl font-bold font-mono">{order.ticketNumber}</p></CardContent>
         </Card>
     )
 }
