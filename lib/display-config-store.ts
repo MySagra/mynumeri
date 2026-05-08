@@ -80,7 +80,8 @@ export function updateConfig(patch: Partial<DisplayConfig>): DisplayConfig {
     }
 
     if (patch.displayMode !== undefined || patch.eventName !== undefined ||
-        patch.numberDisplay !== undefined || patch.ticketNumberMax !== undefined) {
+        patch.numberDisplay !== undefined || patch.ticketNumberMax !== undefined ||
+        patch.stationsEnabled !== undefined) {
         configSubscribers.forEach((fn) => {
             try { fn({ ...cache }); } catch { /* subscriber gone */ }
         });

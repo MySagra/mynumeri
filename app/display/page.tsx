@@ -9,9 +9,7 @@ import { NUMBER_DISPLAY_KEY, TICKET_NUMBER_MAX_KEY } from "@/components/settings
 import type { NumberDisplay } from "@/lib/display-config-store";
 import { useTranslation } from "react-i18next";
 
-const COLS = 5;
-const ROWS = 4;
-const CARDS_PER_PAGE = COLS * ROWS;
+const CARDS_PER_PAGE = 40;
 const PAGE_INTERVAL = 10000;
 
 const HYBRID_PREP_COLS = 4;
@@ -88,6 +86,24 @@ function Footer({ announcement }: { announcement: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// OrderCard
+// ---------------------------------------------------------------------------
+
+function OrderCard({ order, getOrderLabel, cardBgClass = "bg-white" }: {
+    order: ReadyOrder;
+    getOrderLabel: (order: ReadyOrder) => string;
+    cardBgClass?: string;
+}) {
+    return (
+        <div className={`${cardBgClass} border-2 border-gray-200 rounded-2xl flex items-center justify-center shadow-sm p-3`} style={{ containerType: "size" }}>
+            <p className="font-black text-black select-none leading-none" style={{ fontSize: "min(50cqw, 90cqh)" }}>
+                {getOrderLabel(order)}
+            </p>
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
 // DisplaySection
 // ---------------------------------------------------------------------------
 
@@ -102,10 +118,9 @@ interface DisplaySectionProps {
     immediateRemoval?: boolean;
     getOrderLabel: (order: ReadyOrder) => string;
     bare?: boolean;
-    compact?: boolean;
 }
 
-function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, sectionId, immediateRemoval = false, getOrderLabel, bare = false, compact = false }: DisplaySectionProps) {
+function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, sectionId, immediateRemoval = false, getOrderLabel, bare = false }: DisplaySectionProps) {
     const cardsPerPage = cols * rows;
     const [currentPage, setCurrentPage] = useState(0);
     const [displayedOrders, setDisplayedOrders] = useState<(ReadyOrder | null)[]>(orders);
@@ -162,21 +177,15 @@ function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, s
                     </div>
                 )}
             </div>
-            {!bare && (
-                <div className="h-1.5 w-full bg-black/10 shrink-0">
-                    {totalPages > 1 && (
-                        <div key={`${sectionId}-${currentPage}`} className="h-full bg-black/70 rounded-r-full origin-left" style={{ animation: `progress-bar-fill ${PAGE_INTERVAL}ms linear forwards` }} />
-                    )}
-                </div>
-            )}
+            <div className="h-1.5 w-full bg-black/10 shrink-0">
+                {totalPages > 1 && (
+                    <div key={`${sectionId}-${currentPage}`} className="h-full bg-black/70 rounded-r-full origin-left" style={{ animation: `progress-bar-fill ${PAGE_INTERVAL}ms linear forwards` }} />
+                )}
+            </div>
             <div className="flex-1 p-4 overflow-hidden">
-                <div className="h-full grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }}>
+                <div className="h-full grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(100px, 1fr))`, gridTemplateRows: `repeat(auto-fill, minmax(70px, 1fr))` }}>
                     {pageOrders.map((order, idx) => order ? (
-                        <div key={order.id} className={`${cardBgClass} border-2 border-gray-300 rounded-xl flex items-center justify-center shadow-sm`}>
-                            <p className="font-black text-black select-none leading-none" style={{ fontSize: compact ? "clamp(1.25rem, 2vw, 3rem)" : "clamp(2rem, 4vw, 6rem)" }}>
-                                {getOrderLabel(order)}
-                            </p>
-                        </div>
+                        <OrderCard key={order.id} order={order} getOrderLabel={getOrderLabel} cardBgClass={cardBgClass} />
                     ) : (
                         <div key={`blank-${idx}`} />
                     ))}
@@ -236,7 +245,6 @@ function SplitDisplaySection({
                     sectionId={`${sectionId}-top`}
                     immediateRemoval
                     bare
-                    compact
                     getOrderLabel={getOrderLabel}
                 />
             </div>
@@ -251,7 +259,6 @@ function SplitDisplaySection({
                     cardBgClass={bottomCardBgClass}
                     sectionId={`${sectionId}-bottom`}
                     bare
-                    compact
                     getOrderLabel={getOrderLabel}
                 />
             </div>
@@ -395,6 +402,30 @@ export default function Display() {
                 if (mode && ["ready", "preparing", "hybrid"].includes(mode)) { setDisplayMode(mode); displayModeRef.current = mode; }
                 if (cfg.numberDisplay && ["displayCode", "ticketNumber"].includes(cfg.numberDisplay)) setNumberDisplay(cfg.numberDisplay as NumberDisplay);
                 if (typeof cfg.ticketNumberMax === "number" && cfg.ticketNumberMax >= 0) setTicketNumberMax(cfg.ticketNumberMax);
+                if (typeof cfg.stationsEnabled === "boolean") {
+                    stationsEnabledRef.current = cfg.stationsEnabled;
+                    setStationsEnabled(cfg.stationsEnabled);
+                    if (cfg.stationsEnabled) {
+                        fetch("/api/stations")
+                            .then(r => r.ok ? r.json() : null)
+                            .then(data => {
+                                if (Array.isArray(data)) {
+                                    setStations(data);
+                                    const empty: Record<string, ReadyOrder[]> = {};
+                                    for (const s of data) empty[s.id] = [];
+                                    setStationConfirmed({ ...empty });
+                                    setStationCompleted({ ...empty });
+                                    fetchOrders();
+                                }
+                            })
+                            .catch(console.error);
+                    } else {
+                        setStations([]);
+                        setStationConfirmed({});
+                        setStationCompleted({});
+                        fetchOrders();
+                    }
+                }
             } catch { /* ignore */ }
         };
         return () => es.close();
@@ -694,14 +725,16 @@ export default function Display() {
     // ------------------------------------------------------------------
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-gray-100 text-gray-900">
-            <Header
-                pageKey={currentPage}
-                showProgress={!stationsEnabled && displayMode !== "hybrid" && totalPages > 1}
-                currentPage={currentPage}
-                totalPages={totalPages}
-                title={TITLE_MAP[displayMode]}
-                eventName={eventName}
-            />
+            {!effectiveHybrid && (
+                <Header
+                    pageKey={currentPage}
+                    showProgress={!stationsEnabled && displayMode !== "hybrid" && totalPages > 1}
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    title={TITLE_MAP[displayMode]}
+                    eventName={eventName}
+                />
+            )}
 
             {/* STATIONS — HYBRID (≤3 stations): one card per station split top=prep/bottom=ready */}
             {effectiveHybrid ? (
@@ -780,7 +813,6 @@ export default function Display() {
                             cardBgClass="bg-yellow-100"
                             sectionId="prep"
                             immediateRemoval
-                            compact
                             getOrderLabel={getOrderLabel}
                         />
                     </div>
@@ -793,7 +825,6 @@ export default function Display() {
                             headerClass="bg-green-400"
                             cardBgClass="bg-green-100"
                             sectionId="ready"
-                            compact
                             getOrderLabel={getOrderLabel}
                         />
                     </div>
@@ -802,13 +833,9 @@ export default function Display() {
             /* NORMAL — SINGLE MODE */
             ) : (
                 <main className="flex-1 overflow-hidden p-4">
-                    <div className="h-full grid gap-3" style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)`, gridTemplateRows: `repeat(${ROWS}, 1fr)` }}>
+                    <div className="h-full grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(clamp(100px, 14vw, 220px), 1fr))`, gridTemplateRows: `repeat(auto-fill, minmax(80px, 1fr))` }}>
                         {pageOrders.map((order, idx) => order ? (
-                            <div key={order.id} className="order-card bg-white border-2 border-gray-200 rounded-2xl flex items-center justify-center shadow-sm">
-                                <p className="font-black text-black select-none leading-none" style={{ fontSize: "clamp(3rem, 6vw, 9rem)" }}>
-                                    {getOrderLabel(order)}
-                                </p>
-                            </div>
+                            <OrderCard key={order.id} order={order} getOrderLabel={getOrderLabel} />
                         ) : (
                             <div key={`blank-${idx}`} />
                         ))}
