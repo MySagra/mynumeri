@@ -22,6 +22,9 @@ export async function PATCH(request: Request) {
     if (typeof body.stationsEnabled === "boolean") {
         patch.stationsEnabled = body.stationsEnabled;
     }
+    if (typeof body.fullscreenAlertEnabled === "boolean") {
+        patch.fullscreenAlertEnabled = body.fullscreenAlertEnabled;
+    }
 
     const updated = updateConfig(patch);
     return Response.json(updated);

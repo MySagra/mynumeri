@@ -44,6 +44,7 @@ export const en = {
       ordersReady: "Ready Orders",
       ordersPreparing: "Preparing Orders",
       orders: "Orders",
+      orderReady: "Order ready",
       orderReadyCode: "Order ready code:",
       preparingOrderCode: "We are preparing order:"
     },
@@ -91,6 +92,8 @@ export const en = {
       stationsDesc: "Enable pickup station management (kitchen, grill, etc.)",
       stationsEnabled: "Enable stations",
       stationsSaved: "Stations setting saved",
+      fullscreenAlertEnabled: "Full-screen alert",
+      fullscreenAlertEnabledDesc: "Show a full-screen overlay when an order is ready",
       allOrders: "All orders"
     },
     session: {

@@ -31,6 +31,7 @@ interface ReadyOrder {
     displayCode: string;
     ordersStations?: string[];
     orderStationStates?: OrderStationState[];
+    _alertStationId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +97,7 @@ function OrderCard({ order, getOrderLabel, cardBgClass = "bg-white" }: {
 }) {
     return (
         <div className={`${cardBgClass} border-2 border-gray-200 rounded-2xl flex items-center justify-center shadow-sm p-3`} style={{ containerType: "size" }}>
-            <p className="font-black text-black select-none leading-none" style={{ fontSize: "min(50cqw, 90cqh)" }}>
+            <p className="font-black font-mono text-black select-none leading-none" style={{ fontSize: "min(50cqw, 90cqh)" }}>
                 {getOrderLabel(order)}
             </p>
         </div>
@@ -311,6 +312,9 @@ export default function Display() {
     useEffect(() => { stationCompletedRef.current = stationCompleted; }, [stationCompleted]);
 
     // Full-screen overlay
+    const [fullscreenAlertEnabled, setFullscreenAlertEnabled] = useState(true);
+    const fullscreenAlertEnabledRef = useRef(true);
+    useEffect(() => { fullscreenAlertEnabledRef.current = fullscreenAlertEnabled; }, [fullscreenAlertEnabled]);
     const [fsQueue, setFsQueue] = useState<ReadyOrder[]>([]);
     const [currentFsOrder, setCurrentFsOrder] = useState<ReadyOrder | null>(null);
     const [fsExiting, setFsExiting] = useState(false);
@@ -356,6 +360,7 @@ export default function Display() {
                 if (typeof cfg.announcement === "string") setAnnouncement(cfg.announcement);
                 if (cfg.numberDisplay && ["displayCode", "ticketNumber"].includes(cfg.numberDisplay)) setNumberDisplay(cfg.numberDisplay as NumberDisplay);
                 if (typeof cfg.ticketNumberMax === "number" && cfg.ticketNumberMax >= 0) setTicketNumberMax(cfg.ticketNumberMax);
+                if (typeof cfg.fullscreenAlertEnabled === "boolean") { fullscreenAlertEnabledRef.current = cfg.fullscreenAlertEnabled; setFullscreenAlertEnabled(cfg.fullscreenAlertEnabled); }
                 if (cfg.stationsEnabled) {
                     stationsEnabledRef.current = true;
                     setStationsEnabled(true);
@@ -403,6 +408,7 @@ export default function Display() {
                 if (mode && ["ready", "preparing", "hybrid"].includes(mode)) { setDisplayMode(mode); displayModeRef.current = mode; }
                 if (cfg.numberDisplay && ["displayCode", "ticketNumber"].includes(cfg.numberDisplay)) setNumberDisplay(cfg.numberDisplay as NumberDisplay);
                 if (typeof cfg.ticketNumberMax === "number" && cfg.ticketNumberMax >= 0) setTicketNumberMax(cfg.ticketNumberMax);
+                if (typeof cfg.fullscreenAlertEnabled === "boolean") { fullscreenAlertEnabledRef.current = cfg.fullscreenAlertEnabled; setFullscreenAlertEnabled(cfg.fullscreenAlertEnabled); }
                 if (typeof cfg.stationsEnabled === "boolean") {
                     stationsEnabledRef.current = cfg.stationsEnabled;
                     setStationsEnabled(cfg.stationsEnabled);
@@ -519,7 +525,7 @@ export default function Display() {
                     return next;
                 });
                 if (mode === "preparing" || mode === "hybrid") {
-                    setFsQueue(q => q.find(o => String(o.id) === String(data.id)) ? q : [...q, data]);
+                    if (fullscreenAlertEnabledRef.current) setFsQueue(q => q.find(o => String(o.id) === String(data.id)) ? q : [...q, data]);
                 }
                 return;
             }
@@ -528,7 +534,7 @@ export default function Display() {
                 setPrepOrders(prev => prev.find(o => String(o.id) === String(data.id)) ? prev : [...prev, data]);
             }
             if (mode === "preparing") {
-                setFsQueue(q => q.find(o => String(o.id) === String(data.id)) ? q : [...q, data]);
+                if (fullscreenAlertEnabledRef.current) setFsQueue(q => q.find(o => String(o.id) === String(data.id)) ? q : [...q, data]);
             }
         });
 
@@ -577,7 +583,7 @@ export default function Display() {
                         return next;
                     });
                     if (mode === "ready" || mode === "hybrid") {
-                        if (order) setFsQueue(q => q.find(o => String(o.id) === sid) ? q : [...q, order!]);
+                        if (order && fullscreenAlertEnabledRef.current) setFsQueue(q => q.find(o => String(o.id) === sid) ? q : [...q, order!]);
                     }
                 }
                 // PICKED_UP: removeFromAllStationMaps already handled above
@@ -588,7 +594,7 @@ export default function Display() {
             if (mode === "ready" || mode === "hybrid") {
                 if (data.status === "COMPLETED") {
                     setReadyOrders(prev => prev.find(o => String(o.id) === sid) ? prev : [...prev, data]);
-                    setFsQueue(q => q.find(o => String(o.id) === sid) ? q : [...q, data]);
+                    if (fullscreenAlertEnabledRef.current) setFsQueue(q => q.find(o => String(o.id) === sid) ? q : [...q, data]);
                 } else {
                     setReadyOrders(prev => prev.filter(o => String(o.id) !== sid));
                 }
@@ -616,7 +622,7 @@ export default function Display() {
                     if (order) {
                         delete pickedUpOrdersRef.current[sid];
                         setStationCompleted(prev => prev[stationId]?.find(o => String(o.id) === sid) ? prev : { ...prev, [stationId]: [...(prev[stationId] ?? []), order] });
-                        if (mode === "ready" || mode === "hybrid") setFsQueue(q => q.find(o => String(o.id) === sid) ? q : [...q, order]);
+                        if ((mode === "ready" || mode === "hybrid") && fullscreenAlertEnabledRef.current) setFsQueue(q => q.find(o => String(o.id) === sid) ? q : [...q, { ...order, _alertStationId: stationId }]);
                     }
                 } else if (status === "CONFIRMED") {
                     const order = stationCompletedRef.current[stationId]?.find(o => String(o.id) === sid)
@@ -864,9 +870,11 @@ export default function Display() {
                         style={{ minWidth: "min(88vw, 900px)", minHeight: "min(70vh, 600px)" }}
                     >
                         <p className="text-4xl font-bold text-gray-500 uppercase tracking-widest mb-6 select-none">
-                            {currentFsOrder.status === "COMPLETED" ? t("display.orderReadyCode") : t("display.preparingOrderCode")}
+                            {currentFsOrder._alertStationId
+                                ? <>{t("display.orderReady")} in <span className="text-black">{stations.find(s => s.id === currentFsOrder._alertStationId)?.name ?? currentFsOrder._alertStationId}</span></>
+                                : currentFsOrder.status === "COMPLETED" ? t("display.orderReadyCode") : t("display.preparingOrderCode")}
                         </p>
-                        <p className="font-black text-black select-none leading-none" style={{ fontSize: "clamp(8rem, 18vw, 20rem)" }}>
+                        <p className="font-black font-mono text-black select-none leading-none" style={{ fontSize: "clamp(8rem, 18vw, 20rem)" }}>
                             {getOrderLabel(currentFsOrder)}
                         </p>
                     </div>

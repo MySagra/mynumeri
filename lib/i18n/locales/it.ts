@@ -44,6 +44,7 @@ export const it = {
       ordersReady: "Ordini Pronti",
       ordersPreparing: "Ordini in Preparazione",
       orders: "Ordini",
+      orderReady: "Ordine pronto",
       orderReadyCode: "Ordine pronto codice:",
       preparingOrderCode: "Stiamo preparando l'ordine:"
     },
@@ -91,6 +92,8 @@ export const it = {
       stationsDesc: "Abilita la gestione delle postazioni di ritiro (cucina, griglia, ecc.)",
       stationsEnabled: "Abilita postazioni",
       stationsSaved: "Impostazione postazioni salvata",
+      fullscreenAlertEnabled: "Alert a tutto schermo",
+      fullscreenAlertEnabledDesc: "Mostra un overlay a tutto schermo quando un ordine è pronto",
       allOrders: "Tutti gli ordini"
     },
     session: {

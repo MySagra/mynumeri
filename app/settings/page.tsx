@@ -5,8 +5,6 @@ import { AppearanceSettingsCard } from "@/components/settings/AppearanceSettings
 import { GeneralSettingsCard } from "@/components/settings/GeneralSettingsCard";
 import { DisplayModeSettingsCard } from "@/components/settings/DisplayModeSettingsCard";
 import { NumberDisplaySettingsCard } from "@/components/settings/NumberDisplaySettingsCard";
-import { StationsSettingsCard } from "@/components/settings/StationsSettingsCard";
-
 export default function SettingsPage() {
     return (
         <>
@@ -16,7 +14,6 @@ export default function SettingsPage() {
                     <GeneralSettingsCard />
                     <DisplayModeSettingsCard />
                     <NumberDisplaySettingsCard />
-                    <StationsSettingsCard />
                     <AppearanceSettingsCard />
                 </div>
             </main>

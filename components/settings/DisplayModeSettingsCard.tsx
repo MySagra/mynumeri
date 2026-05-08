@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Label } from "../ui/label";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 
@@ -18,6 +19,10 @@ export function DisplayModeSettingsCard() {
     const { t } = useTranslation();
     const [mode, setMode] = useState<DisplayMode>("ready");
     const [savedMode, setSavedMode] = useState<DisplayMode>("ready");
+    const [stationsEnabled, setStationsEnabled] = useState(false);
+    const [savedStationsEnabled, setSavedStationsEnabled] = useState(false);
+    const [fullscreenAlertEnabled, setFullscreenAlertEnabled] = useState(true);
+    const [savedFullscreenAlertEnabled, setSavedFullscreenAlertEnabled] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -55,6 +60,14 @@ export function DisplayModeSettingsCard() {
                         setSavedMode(stored);
                     }
                 }
+                if (typeof cfg?.stationsEnabled === "boolean") {
+                    setStationsEnabled(cfg.stationsEnabled);
+                    setSavedStationsEnabled(cfg.stationsEnabled);
+                }
+                if (typeof cfg?.fullscreenAlertEnabled === "boolean") {
+                    setFullscreenAlertEnabled(cfg.fullscreenAlertEnabled);
+                    setSavedFullscreenAlertEnabled(cfg.fullscreenAlertEnabled);
+                }
             })
             .catch(() => {
                 const stored = localStorage.getItem(DISPLAY_MODE_KEY) as DisplayMode | null;
@@ -72,9 +85,11 @@ export function DisplayModeSettingsCard() {
             await fetch("/api/display-config", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ displayMode: mode }),
+                body: JSON.stringify({ displayMode: mode, stationsEnabled, fullscreenAlertEnabled }),
             });
             setSavedMode(mode);
+            setSavedStationsEnabled(stationsEnabled);
+            setSavedFullscreenAlertEnabled(fullscreenAlertEnabled);
             localStorage.setItem(DISPLAY_MODE_KEY, mode);
             toast.success(t("settings.displayModeSaved"));
         } catch {
@@ -84,7 +99,10 @@ export function DisplayModeSettingsCard() {
         }
     };
 
-    const hasChanges = mode !== savedMode;
+    const hasChanges =
+        mode !== savedMode ||
+        stationsEnabled !== savedStationsEnabled ||
+        fullscreenAlertEnabled !== savedFullscreenAlertEnabled;
 
     return (
         <Card>
@@ -136,6 +154,32 @@ export function DisplayModeSettingsCard() {
                         ))}
                     </div>
                 )}
+
+                <div className="flex flex-col items-end gap-3 mt-6">
+                    <div className="flex items-center gap-3">
+                        <Label htmlFor="fullscreen-alert-enabled" className="cursor-pointer select-none text-sm">
+                            {t("settings.fullscreenAlertEnabled")}
+                        </Label>
+                        <Switch
+                            id="fullscreen-alert-enabled"
+                            checked={fullscreenAlertEnabled}
+                            onCheckedChange={setFullscreenAlertEnabled}
+                            disabled={isLoading}
+                        />
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <Label htmlFor="stations-enabled" className="cursor-pointer select-none text-sm">
+                            {t("settings.stationsEnabled")}
+                        </Label>
+                        <Switch
+                            id="stations-enabled"
+                            checked={stationsEnabled}
+                            onCheckedChange={setStationsEnabled}
+                            disabled={isLoading}
+                        />
+                    </div>
+                </div>
+
                 <div className="flex justify-end mt-4">
                     <Button onClick={handleSave} disabled={!hasChanges || isSaving || isLoading}>
                         {isSaving ? t("settings.saving") : t("settings.save")}
