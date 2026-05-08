@@ -189,7 +189,7 @@ export function DisplayModeSettingsCard() {
                                         type="range"
                                         min="50"
                                         max="200"
-                                        step="10"
+                                        step="5"
                                         value={displayZoom}
                                         onChange={(e) => setDisplayZoom(parseInt(e.target.value, 10))}
                                         disabled={isLoading}
@@ -199,9 +199,21 @@ export function DisplayModeSettingsCard() {
                                         }}
                                     />
                                     <ZoomIn className="h-4 w-4 text-blue-600" />
-                                    <span className="text-sm font-bold min-w-12 text-center text-blue-700 dark:text-blue-400 tabular-nums">
-                                        {displayZoom}%
-                                    </span>
+                                    <input
+                                        type="number"
+                                        min="50"
+                                        max="200"
+                                        value={displayZoom}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value, 10);
+                                            if (!isNaN(val) && val >= 50 && val <= 200) {
+                                                setDisplayZoom(val);
+                                            }
+                                        }}
+                                        disabled={isLoading}
+                                        className="w-14 h-8 rounded px-2 text-sm font-bold text-center text-blue-700 dark:text-blue-400 bg-white dark:bg-blue-900/50 border border-blue-200 dark:border-blue-800 tabular-nums"
+                                    />
+                                    <span className="text-sm font-medium text-blue-700 dark:text-blue-400">%</span>
                                 </div>
                                 <div className="grid grid-cols-3 gap-2">
                                     <button
