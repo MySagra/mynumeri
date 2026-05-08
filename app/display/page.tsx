@@ -453,7 +453,6 @@ export default function Display() {
                 const confirmedMap: Record<string, ReadyOrder[]> = {};
                 const completedMap: Record<string, ReadyOrder[]> = {};
                 for (const o of orders) {
-                    if (o.status === 'PICKED_UP') continue;
                     const ro: ReadyOrder = { id: o.id, ticketNumber: o.ticketNumber, displayCode: o.displayCode, status: o.status, ordersStations: o.ordersStations, orderStationStates: o.orderStationStates };
                     for (const state of o.orderStationStates ?? []) {
                         if (state.status === 'CONFIRMED') {
@@ -462,6 +461,9 @@ export default function Display() {
                         } else if (state.status === 'COMPLETED') {
                             if (!(state.stationId in completedMap)) completedMap[state.stationId] = [];
                             if (!completedMap[state.stationId].find(x => x.id === o.id)) completedMap[state.stationId].push(ro);
+                        } else if (state.status === 'PICKED_UP') {
+                            // Track in ref so SSE COMPLETED (undo pickup) can find the order
+                            pickedUpOrdersRef.current[String(o.id)] = ro;
                         }
                     }
                 }
