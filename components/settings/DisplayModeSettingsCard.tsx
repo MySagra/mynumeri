@@ -155,8 +155,8 @@ export function DisplayModeSettingsCard() {
                     </div>
                 )}
 
-                <div className="flex flex-col items-end gap-3 mt-6">
-                    <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-3 mt-6">
+                    <div className="flex items-center justify-between gap-3">
                         <Label htmlFor="fullscreen-alert-enabled" className="cursor-pointer select-none text-sm">
                             {t("settings.fullscreenAlertEnabled")}
                         </Label>
@@ -167,7 +167,7 @@ export function DisplayModeSettingsCard() {
                             disabled={isLoading}
                         />
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between gap-3">
                         <Label htmlFor="stations-enabled" className="cursor-pointer select-none text-sm">
                             {t("settings.stationsEnabled")}
                         </Label>

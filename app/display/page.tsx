@@ -122,14 +122,39 @@ interface DisplaySectionProps {
 }
 
 function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, sectionId, immediateRemoval = false, getOrderLabel, bare = false }: DisplaySectionProps) {
-    const cardsPerPage = cols * rows;
+    const staticCardsPerPage = cols * rows;
+    const [effectiveCardsPerPage, setEffectiveCardsPerPage] = useState(staticCardsPerPage);
+    const cardsPerPage = effectiveCardsPerPage;
     const [currentPage, setCurrentPage] = useState(0);
     const [displayedOrders, setDisplayedOrders] = useState<(ReadyOrder | null)[]>(orders);
     const latestRef = useRef<ReadyOrder[]>(orders);
+    const gridRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => { latestRef.current = orders; }, [orders]);
 
-    const totalPages = Math.max(1, Math.ceil(displayedOrders.length / cardsPerPage));
+    // Compute actual grid capacity from container size — CSS uses auto-fill so visual
+    // slots depend on container dimensions, not cols*rows props.
+    useEffect(() => {
+        const el = gridRef.current;
+        if (!el) return;
+        const compute = () => {
+            const { width, height } = el.getBoundingClientRect();
+            if (width < 10 || height < 10) return;
+            const gap = 12; // gap-3 = 12px
+            const minColW = 100; // minmax(100px, 1fr)
+            const minRowH = 70;  // minmax(70px, 1fr)
+            const c = Math.max(1, Math.floor((width + gap) / (minColW + gap)));
+            const r = Math.max(1, Math.floor((height + gap) / (minRowH + gap)));
+            setEffectiveCardsPerPage(c * r);
+        };
+        compute();
+        const ro = new ResizeObserver(compute);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+
+    const realOrderCount = displayedOrders.filter((o): o is ReadyOrder => o !== null).length;
+    const totalPages = Math.max(1, Math.ceil(realOrderCount / cardsPerPage));
 
     useEffect(() => {
         setDisplayedOrders(prev => {
@@ -184,7 +209,7 @@ function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, s
                 )}
             </div>
             <div className="flex-1 p-4 overflow-hidden">
-                <div className="h-full grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(100px, 1fr))`, gridTemplateRows: `repeat(auto-fill, minmax(70px, 1fr))` }}>
+                <div ref={gridRef} className="h-full grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(100px, 1fr))`, gridTemplateRows: `repeat(auto-fill, minmax(70px, 1fr))` }}>
                     {pageOrders.map((order, idx) => order ? (
                         <OrderCard key={order.id} order={order} getOrderLabel={getOrderLabel} cardBgClass={cardBgClass} />
                     ) : (
