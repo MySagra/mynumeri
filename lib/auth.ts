@@ -24,14 +24,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     if (cookieString) {
                         const tokenMatch = cookieString.match(/mysagra_token=([^;]+)/);
                         if (tokenMatch && tokenMatch[1]) {
+                            const rawToken = tokenMatch[1];
+                            let maxAge = 12 * 60 * 60;
+                            try {
+                                const payload = JSON.parse(
+                                    Buffer.from(rawToken.split('.')[1], 'base64url').toString()
+                                );
+                                if (payload.exp) {
+                                    maxAge = payload.exp - Math.floor(Date.now() / 1000);
+                                }
+                            } catch { /* malformed JWT, fallback to default */ }
+
                             (await cookies()).set({
                                 name: 'mynumeri_token',
-                                value: tokenMatch[1],
+                                value: rawToken,
                                 httpOnly: true,
                                 secure: process.env.NODE_ENV === 'production',
                                 sameSite: 'lax',
                                 path: '/',
-                                maxAge: 6 * 60 * 60
+                                maxAge
                             });
                         }
                     }
