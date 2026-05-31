@@ -2,8 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
-import { signOut } from "next-auth/react";
 import { logout as logoutAction } from "@/actions/auth";
+import { USER_STORAGE_KEY } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 
@@ -11,17 +11,13 @@ export function LogoutButton() {
     const { t } = useTranslation();
     const handleLogout = async () => {
         try {
-            // Call backend logout to revoke refresh token
             await logoutAction();
-
-            // Then sign out from NextAuth
-            await signOut({ redirect: true, callbackUrl: "/" });
-
             toast.success(t("session.logoutSuccess"));
         } catch (error) {
             console.error("Logout error:", error);
-            // Still try to sign out even if backend logout fails
-            await signOut({ redirect: true, callbackUrl: "/" });
+        } finally {
+            localStorage.removeItem(USER_STORAGE_KEY);
+            window.location.href = "/";
         }
     };
 

@@ -7,6 +7,14 @@ import { LoginForm } from "@/components/login/login-form";
 import { useTheme } from '@teispace/next-themes';
 import { Moon, Sun, } from 'lucide-react';
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+
+// Mappa codice errore (?error=) -> chiave di traduzione del toast
+const ERROR_MESSAGE_KEYS: Record<string, string> = {
+    session_expired: "login.sessionExpired",
+    unauthorized: "login.sessionExpired",
+    forbidden: "login.accessDenied",
+};
 
 export default function LoginPage() {
     const { theme, setTheme } = useTheme();
@@ -17,6 +25,16 @@ export default function LoginPage() {
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Mostra un toast se reindirizzati al login con un codice errore (?error=)
+    useEffect(() => {
+        const error = new URLSearchParams(window.location.search).get("error");
+        if (!error) return;
+        const key = ERROR_MESSAGE_KEYS[error] ?? "login.sessionExpired";
+        toast.error(t(key));
+        // Rimuovi il parametro così il toast non riappare al refresh
+        window.history.replaceState({}, "", "/");
+    }, [t]);
 
     return (
         <div className="bg-muted flex min-h-svh flex-col items-center justify-center p-6 md:p-10">

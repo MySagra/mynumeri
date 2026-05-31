@@ -5,8 +5,8 @@ import { Button } from "../ui/button";
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { signOut, useSession } from "next-auth/react";
 import { logout as logoutAction } from "@/actions/auth";
+import { useAuth, USER_STORAGE_KEY } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { ButtonGroup } from "../ui/button-group";
 import { useRouter } from "next/navigation";
@@ -22,7 +22,7 @@ interface HeaderProps {
 
 export function Header({ pickedUpOrders, onPickupPrev }: HeaderProps = {}) {
     const router = useRouter();
-    const { data: session } = useSession();
+    const { user } = useAuth();
     const { t } = useTranslation();
 
     const [noticeText, setNoticeText] = useState("");
@@ -90,11 +90,12 @@ export function Header({ pickedUpOrders, onPickupPrev }: HeaderProps = {}) {
     const handleLogout = async () => {
         try {
             await logoutAction();
-            await signOut({ redirect: true, callbackUrl: "/" });
             toast.success(t("manager.logoutSuccess"));
         } catch (error) {
             console.error("Logout error:", error);
-            await signOut({ redirect: true, callbackUrl: "/" });
+        } finally {
+            localStorage.removeItem(USER_STORAGE_KEY);
+            window.location.href = "/";
         }
     };
 
@@ -181,8 +182,8 @@ export function Header({ pickedUpOrders, onPickupPrev }: HeaderProps = {}) {
                         {t("manager.openDisplay")}
                     </a>
                 </Button>
-                {session?.user && (
-                    <UserMenu user={session.user} onLogout={handleLogout} onOpenAvvisi={() => setAvvisiOpen(true)} />
+                {user && (
+                    <UserMenu user={user} onLogout={handleLogout} onOpenAvvisi={() => setAvvisiOpen(true)} />
                 )}
             </div>
         </header>

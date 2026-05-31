@@ -18,7 +18,9 @@ export const it = {
       invalidCredentials: "Credenziali non valide",
       loginSuccess: "Login effettuato con successo!",
       loginError: "Errore durante il login",
-      validationError: "Errore di validazione"
+      validationError: "Errore di validazione",
+      sessionExpired: "Sessione scaduta, effettua di nuovo il login",
+      accessDenied: "Accesso negato: permessi insufficienti"
     },
     manager: {
       preparingOrders: "Ordini in preparazione",
