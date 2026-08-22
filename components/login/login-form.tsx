@@ -6,17 +6,16 @@ import { Field, FieldDescription, FieldGroup, FieldLabel, } from "@/components/u
 import { Input } from "@/components/ui/input"
 import { FormField, FormItem, FormControl } from "@/components/ui/form"
 import { Eye, EyeOff } from "lucide-react"
-import { useRouter } from "next/navigation";
 import { useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, FormProvider } from "react-hook-form"
 import { toast } from "sonner";
-import { signIn } from "next-auth/react";
+import { login as loginAction } from "@/actions/auth";
+import { USER_STORAGE_KEY } from "@/hooks/use-auth";
 import z from "zod"
 import { useTranslation } from "react-i18next"
 
 export function LoginForm() {
-    const router = useRouter();
     const { t } = useTranslation();
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
@@ -37,20 +36,18 @@ export function LoginForm() {
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsLoading(true);
         try {
-            const result = await signIn("credentials", {
-                username: values.username,
-                password: values.password,
-                redirect: false,
-            });
+            const result = await loginAction(values.username, values.password);
 
-            if (result?.error) {
-                toast.error(t("login.invalidCredentials"));
-                form.reset();
-            } else if (result?.ok) {
-                // Successful login
+            if (result.success) {
+                localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(result.user));
                 toast.success(t("login.loginSuccess"));
-                router.push("/manager");
-                router.refresh();
+                // Attendi che il cookie di sessione sia committato prima del reload.
+                await new Promise(resolve => setTimeout(resolve, 100));
+                // Full reload so il middleware veda il cookie appena impostato.
+                window.location.href = "/manager";
+            } else {
+                toast.error(result.error || t("login.invalidCredentials"));
+                form.reset();
             }
         } catch (error) {
             console.error('Login error:', error);

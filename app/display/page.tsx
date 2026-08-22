@@ -2,6 +2,7 @@
 
 import { Header } from "@/components/display/header";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { getWorkdayBounds, sortByDate } from "@/utils/utils";
 import { type DisplayMode, DISPLAY_MODE_KEY } from "@/components/settings/DisplayModeSettingsCard";
 import { EVENT_NAME_KEY } from "@/components/settings/GeneralSettingsCard";
@@ -9,6 +10,7 @@ import { NUMBER_DISPLAY_KEY, TICKET_NUMBER_MAX_KEY } from "@/components/settings
 import { DISPLAY_ZOOM_KEY } from "@/components/settings/DisplayZoomSettingsCard";
 import type { NumberDisplay } from "@/lib/display-config-store";
 import { useTranslation } from "react-i18next";
+import { apiFetch, handleApiError } from "@/lib/api";
 
 const CARDS_PER_PAGE = 40;
 const PAGE_INTERVAL = 10000;
@@ -312,6 +314,7 @@ function SplitDisplaySection({
 
 export default function Display() {
     const { t } = useTranslation();
+    const router = useRouter();
     const [displayMode, setDisplayMode] = useState<DisplayMode>("ready");
     const [numberDisplay, setNumberDisplay] = useState<NumberDisplay>("displayCode");
     const [ticketNumberMax, setTicketNumberMax] = useState<number>(100);
@@ -415,9 +418,7 @@ export default function Display() {
         try {
             const { dateFrom, dateTo } = getWorkdayBounds();
             const dateParams = `&dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`;
-            const res = await fetch(`/api/orders?limit=100${dateParams}&include=ordersStationsStates`);
-            if (!res.ok) return;
-            const json = await res.json();
+            const json = await apiFetch<{ data?: Order[]; orders?: Order[] }>(`/api/orders?limit=100${dateParams}&include=ordersStationsStates`);
             const orders: Order[] = json.data || json.orders || (Array.isArray(json) ? json : []);
             if (!Array.isArray(orders)) return;
 
@@ -433,9 +434,10 @@ export default function Display() {
             const filtered = orders.filter(o => (o.orderStationStates ?? []).length > 0);
             setOrdersMap(new Map(filtered.map(o => [o.id, toRO(o)])));
         } catch (err) {
+            if (handleApiError(err, router)) return;
             console.error("Failed to fetch orders:", err);
         }
-    }, []);
+    }, [router]);
 
     // ------------------------------------------------------------------
     // Fetch display config
@@ -468,15 +470,14 @@ export default function Display() {
                 if (cfg.stationsEnabled) {
                     stationsEnabledRef.current = true;
                     setStationsEnabled(true);
-                    fetch("/api/stations")
-                        .then(r => r.ok ? r.json() : null)
+                    apiFetch<Station[]>("/api/stations")
                         .then(data => {
                             if (Array.isArray(data)) {
                                 setStations(data);
                                 fetchOrders();
                             }
                         })
-                        .catch(console.error);
+                        .catch(err => { if (!handleApiError(err, router)) console.error(err); });
                 } else {
                     fetchOrders();
                 }
@@ -517,15 +518,14 @@ export default function Display() {
                     stationsEnabledRef.current = cfg.stationsEnabled;
                     setStationsEnabled(cfg.stationsEnabled);
                     if (cfg.stationsEnabled) {
-                        fetch("/api/stations")
-                            .then(r => r.ok ? r.json() : null)
+                        apiFetch<Station[]>("/api/stations")
                             .then(data => {
                                 if (Array.isArray(data)) {
                                     setStations(data);
                                     fetchOrders();
                                 }
                             })
-                            .catch(console.error);
+                            .catch(err => { if (!handleApiError(err, router)) console.error(err); });
                     } else {
                         setStations([]);
                         fetchOrders();

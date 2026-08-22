@@ -1,12 +1,14 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/manager/header";
 import OrdersGrid from "@/components/manager/orders-grid";
 import { PickedUpOrdersSheet } from "@/components/manager/picked-up-orders-sheet";
 import { StationCard } from "@/components/manager/StationCard";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { apiFetch, handleApiError } from "@/lib/api";
 
 function getWorkdayBounds() {
     const now = new Date();
@@ -30,6 +32,7 @@ const toOrder = (o: Order): Order => ({
 
 export default function Manager() {
     const { t } = useTranslation();
+    const router = useRouter();
 
     // Single source of truth: all orders keyed by id
     const [ordersMap, setOrdersMap] = useState<Map<string, Order>>(new Map());
@@ -111,9 +114,7 @@ export default function Manager() {
         let all: Order[] = [];
         let hasNextPage = true;
         while (hasNextPage) {
-            const res = await fetch(`/api/orders?limit=100&page=${page}${baseParams}`);
-            if (!res.ok) break;
-            const json = await res.json();
+            const json = await apiFetch<{ data?: Order[]; orders?: Order[]; pagination?: { currentPage?: number; totalPages?: number } }>(`/api/orders?limit=100&page=${page}${baseParams}`);
             const batch: Order[] = json.data || json.orders || (Array.isArray(json) ? json : []);
             if (Array.isArray(batch)) all = [...all, ...batch.map(toOrder)];
             hasNextPage = (json.pagination?.currentPage ?? 0) < (json.pagination?.totalPages ?? 0);
@@ -129,31 +130,28 @@ export default function Manager() {
             const orders = await fetchAllPages(`${dateParams}&include=ordersStationsStates`);
             setOrdersMap(new Map(orders.map(o => [o.id, o])));
         } catch (error) {
+            if (handleApiError(error, router)) return;
             console.error("Failed to fetch orders:", error);
         }
-    }, []);
+    }, [router]);
 
     // Fetch display config + stations on mount
     useEffect(() => {
         fetch("/api/display-config")
             .then(res => res.ok ? res.json() : null)
-            .then(cfg => {
+            .then(async cfg => {
                 if (cfg?.stationsEnabled) {
                     stationsEnabledRef.current = true;
                     setStationsEnabled(true);
-                    return fetch("/api/stations");
-                }
-                return null;
-            })
-            .then(res => res && res.ok ? res.json() : null)
-            .then(data => {
-                if (Array.isArray(data)) {
-                    setStations(data);
-                    fetchOrders();
+                    const data = await apiFetch<Station[]>("/api/stations");
+                    if (Array.isArray(data)) {
+                        setStations(data);
+                        fetchOrders();
+                    }
                 }
             })
-            .catch(console.error);
-    }, []);
+            .catch(err => { if (!handleApiError(err, router)) console.error(err); });
+    }, [router]);
 
     // SSE setup
     useEffect(() => {
@@ -259,13 +257,15 @@ export default function Manager() {
             const endpoint = stationId
                 ? `/api/orders/${orderId}/stations/${stationId}`
                 : `/api/orders/${orderId}`;
-            const res = await fetch(endpoint, {
+            await apiFetch(endpoint, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status: newStatus }),
             });
-            if (!res.ok) { fetchOrders(); }
-        } catch { fetchOrders(); }
+        } catch (error) {
+            if (handleApiError(error, router)) return;
+            fetchOrders();
+        }
     };
 
     // --- Station mode handlers ---

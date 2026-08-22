@@ -1,10 +1,9 @@
-import { cookies } from "next/headers";
+import { getAuthToken, AUTH_COOKIE_NAME } from "@/lib/auth";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("mynumeri_token")?.value;
+    const token = await getAuthToken();
 
     if (!token) {
         return new Response("Unauthorized", { status: 401 });
@@ -20,7 +19,7 @@ export async function GET(request: Request) {
             signal: request.signal,
             headers: {
                 "Accept": "text/event-stream",
-                "Cookie": token ? `mysagra_token=${token}` : "",
+                "Cookie": `${AUTH_COOKIE_NAME}=${token}`,
                 ...(lastEventId ? { "Last-Event-ID": lastEventId } : {}),
             }
         });

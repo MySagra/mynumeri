@@ -18,7 +18,9 @@ export const en = {
       invalidCredentials: "Invalid credentials",
       loginSuccess: "Login successful!",
       loginError: "Error during login",
-      validationError: "Validation error"
+      validationError: "Validation error",
+      sessionExpired: "Session expired, please log in again",
+      accessDenied: "Access denied: insufficient permissions"
     },
     manager: {
       preparingOrders: "Preparing orders",

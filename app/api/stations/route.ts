@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { getAuthToken, AUTH_COOKIE_NAME } from "@/lib/auth";
 
 export async function GET() {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("mynumeri_token")?.value;
+    const token = await getAuthToken();
 
     if (!token) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -13,7 +12,7 @@ export async function GET() {
 
     const response = await fetch(`${backendUrl}/v1/stations`, {
         headers: {
-            "Cookie": `mysagra_token=${token}`,
+            "Cookie": `${AUTH_COOKIE_NAME}=${token}`,
         },
     });
 
