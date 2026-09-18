@@ -14,6 +14,7 @@ import { useState, useEffect } from "react";
 import { UserMenu } from "@/components/manager/UserMenu";
 import { PickedUpOrdersSheet } from "@/components/manager/picked-up-orders-sheet";
 import { useTranslation } from "react-i18next";
+import { subscribeSSE } from "@/lib/sse";
 
 interface HeaderProps {
     pickedUpOrders?: Order[];
@@ -47,17 +48,18 @@ export function Header({ pickedUpOrders, onPickupPrev }: HeaderProps = {}) {
     }, []);
 
     useEffect(() => {
-        const es = new EventSource("/api/announcement/events");
-        es.onmessage = (event) => {
-            try {
-                const { announcement: text } = JSON.parse(event.data);
+        const close = subscribeSSE("/api/announcement/events", {
+            onMessage: (data) => {
+                const { announcement: text } = (data ?? {}) as { announcement?: string };
+                if (typeof text !== "string") return;
                 setAvvisiOpen(open => {
                     if (!open) setNoticeText(text);
                     return open;
                 });
-            } catch { /* ignore */ }
-        };
-        return () => es.close();
+            },
+            onError: err => console.error("SSE announcement:", err),
+        });
+        return () => close();
     }, []);
 
     useEffect(() => {

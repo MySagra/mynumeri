@@ -9,6 +9,8 @@ import { StationCard } from "@/components/manager/StationCard";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { apiFetch, handleApiError } from "@/lib/api";
+import { subscribeSSE } from "@/lib/sse";
+import { resolveOrderEventType, statusForOrderEvent } from "@/lib/order-events";
 
 function getWorkdayBounds() {
     const now = new Date();
@@ -42,27 +44,34 @@ export default function Manager() {
     const [stationsEnabled, setStationsEnabled] = useState(false);
     const stationsEnabledRef = useRef(false);
 
+    // Con le postazioni disattivate il backend non popola `orderStationStates`:
+    // filtrare su quell'array nasconderebbe tutti gli ordini.
+    const hasStationStates = useCallback(
+        (o: Order) => !stationsEnabled || (o.orderStationStates ?? []).length > 0,
+        [stationsEnabled]
+    );
+
     // --- Derived lists: normal mode ---
     const confirmedOrders = useMemo(() =>
         Array.from(ordersMap.values()).filter(o =>
-            (o.orderStationStates ?? []).length > 0 &&
+            hasStationStates(o) &&
             (o.status === 'CONFIRMED' || o.status === 'PARTIAL')
         ),
-        [ordersMap]
+        [ordersMap, hasStationStates]
     );
 
     const readyOrders = useMemo(() =>
         Array.from(ordersMap.values()).filter(o =>
-            (o.orderStationStates ?? []).length > 0 && o.status === 'COMPLETED'
+            hasStationStates(o) && o.status === 'COMPLETED'
         ),
-        [ordersMap]
+        [ordersMap, hasStationStates]
     );
 
     const pickedUpOrders = useMemo(() =>
         Array.from(ordersMap.values()).filter(o =>
-            (o.orderStationStates ?? []).length > 0 && o.status === 'PICKED_UP'
+            hasStationStates(o) && o.status === 'PICKED_UP'
         ),
-        [ordersMap]
+        [ordersMap, hasStationStates]
     );
 
     // --- Derived maps: station mode ---
@@ -157,99 +166,103 @@ export default function Manager() {
     useEffect(() => {
         fetchOrders();
 
-        const eventSource = new EventSource('/api/events/display');
-        let isFirstOpen = true;
-
-        // Refetch full state on every reconnect to resync after any missed events
-        eventSource.addEventListener('open', () => {
-            if (!isFirstOpen) fetchOrders();
-            isFirstOpen = false;
-        });
-
-        const handleConfirmedOrder = (event: MessageEvent) => {
+        const handleConfirmedOrder = (data: unknown, _frame?: unknown, type = 'confirmed-order') => {
             try {
-                const raw = toOrder(JSON.parse(event.data));
-                if ((raw.ordersStations ?? []).length === 0) return;
-                // Synthesize station states from ordersStations if not included in payload
+                const raw = toOrder(data as Order);
+                // Con le postazioni attive un ordine senza stazioni non è di competenza del manager
+                if (stationsEnabledRef.current && (raw.ordersStations ?? []).length === 0) return;
+                // Il payload dell'evento non porta `status`: lo si deduce dal tipo evento
+                const status = raw.status ?? statusForOrderEvent(type) ?? 'CONFIRMED';
+                // Postazioni attive: la UI legge gli station states, sintetizzati se assenti.
+                // Postazioni disattive: resta vuoto e conta lo `status` a livello ordine.
                 const orderStationStates = (raw.orderStationStates ?? []).length > 0
                     ? raw.orderStationStates!
-                    : (raw.ordersStations ?? []).map(stId => ({ stationId: stId, status: 'CONFIRMED' }));
-                setOrdersMap(prev => new Map(prev).set(raw.id, { ...raw, orderStationStates }));
+                    : (raw.ordersStations ?? []).map(stId => ({ stationId: stId, status }));
+                setOrdersMap(prev => new Map(prev).set(raw.id, { ...raw, status, orderStationStates }));
             } catch (err) {
-                console.error("Error parsing confirmed-order event:", err);
+                console.error("Error handling confirmed-order event:", err);
             }
         };
 
-        eventSource.addEventListener('confirmed-order', handleConfirmedOrder);
-        eventSource.onmessage = handleConfirmedOrder;
+        const close = subscribeSSE('/api/events/display', {
+            // Il tipo evento arriva da `event:`, dal campo `type` del payload o,
+            // in ultima istanza, viene dedotto dalla forma del JSON.
+            resolveType: resolveOrderEventType,
+            // Refetch full state on every reconnect to resync after any missed events
+            onOpen: ({ reconnect }) => { if (reconnect) fetchOrders(); },
+            onError: () => { console.error("SSE connection error"); },
+            // Evento senza tipo riconoscibile: trattato come confirmed-order (comportamento storico)
+            onMessage: handleConfirmedOrder,
+            on: {
+                'confirmed-order': handleConfirmedOrder,
 
-        eventSource.addEventListener('order-status-update', (event: MessageEvent) => {
-            try {
-                const { id, status, displayCode, ticketNumber } = JSON.parse(event.data);
-                setOrdersMap(prev => {
-                    const existing = prev.get(String(id));
-                    if (!existing) return prev;
+                'order-status-update': (data) => {
+                    try {
+                        const { id, status, displayCode, ticketNumber } = data as Order;
+                        setOrdersMap(prev => {
+                            const existing = prev.get(String(id));
+                            if (!existing) return prev;
 
-                    let orderStationStates = existing.orderStationStates;
-                    // In station mode, propagate order-level status to station states.
-                    // This handles header undo ops that PATCH order-level (no stationId).
-                    if (stationsEnabledRef.current) {
-                        if (status === 'COMPLETED') {
-                            orderStationStates = (orderStationStates ?? []).map(s =>
-                                s.status === 'PICKED_UP' ? { ...s, status: 'COMPLETED' } : s
-                            );
-                        } else if (status === 'CONFIRMED') {
-                            orderStationStates = (orderStationStates ?? []).map(s =>
-                                s.status === 'COMPLETED' ? { ...s, status: 'CONFIRMED' } : s
-                            );
-                        }
+                            let orderStationStates = existing.orderStationStates;
+                            // In station mode, propagate order-level status to station states.
+                            // This handles header undo ops that PATCH order-level (no stationId).
+                            if (stationsEnabledRef.current) {
+                                if (status === 'COMPLETED') {
+                                    orderStationStates = (orderStationStates ?? []).map(s =>
+                                        s.status === 'PICKED_UP' ? { ...s, status: 'COMPLETED' } : s
+                                    );
+                                } else if (status === 'CONFIRMED') {
+                                    orderStationStates = (orderStationStates ?? []).map(s =>
+                                        s.status === 'COMPLETED' ? { ...s, status: 'CONFIRMED' } : s
+                                    );
+                                }
+                            }
+
+                            return new Map(prev).set(String(id), {
+                                ...existing,
+                                status,
+                                displayCode,
+                                ticketNumber,
+                                orderStationStates,
+                            });
+                        });
+                    } catch (err) {
+                        console.error("Error handling order-status-update event:", err);
                     }
+                },
 
-                    return new Map(prev).set(String(id), {
-                        ...existing,
-                        status,
-                        displayCode,
-                        ticketNumber,
-                        orderStationStates,
-                    });
-                });
-            } catch (err) {
-                console.error("Error parsing order-status-update event:", err);
-            }
+                'order-station-status-update': (data) => {
+                    try {
+                        const { orderId, stationId, status } = data as { orderId: string; stationId: string; status: Status };
+                        setOrdersMap(prev => {
+                            const order = prev.get(String(orderId));
+                            if (!order) return prev;
+                            const existing = order.orderStationStates ?? [];
+                            const hasState = existing.some(s => s.stationId === stationId);
+                            const updatedStates = hasState
+                                ? existing.map(s => s.stationId === stationId ? { ...s, status } : s)
+                                : [...existing, { stationId, status }];
+                            return new Map(prev).set(order.id, { ...order, orderStationStates: updatedStates });
+                        });
+                    } catch (err) {
+                        console.error("Error handling order-station-status-update event:", err);
+                    }
+                },
+
+                'order-cancelled': (data) => {
+                    try {
+                        const cancelled = data as Order;
+                        const sid = String(cancelled.id);
+                        setOrdersMap(prev => { const next = new Map(prev); next.delete(sid); return next; });
+                        toast.warning(t("manager.orderCancelled", { code: cancelled.displayCode }));
+                    } catch (err) {
+                        console.error("Error handling order-cancelled event:", err);
+                    }
+                },
+            },
         });
 
-        eventSource.addEventListener('order-station-status-update', (event: MessageEvent) => {
-            try {
-                const { orderId, stationId, status } = JSON.parse(event.data);
-                setOrdersMap(prev => {
-                    const order = prev.get(String(orderId));
-                    if (!order) return prev;
-                    const existing = order.orderStationStates ?? [];
-                    const hasState = existing.some(s => s.stationId === stationId);
-                    const updatedStates = hasState
-                        ? existing.map(s => s.stationId === stationId ? { ...s, status } : s)
-                        : [...existing, { stationId, status }];
-                    return new Map(prev).set(order.id, { ...order, orderStationStates: updatedStates });
-                });
-            } catch (err) {
-                console.error("Error parsing order-station-status-update event:", err);
-            }
-        });
-
-        eventSource.addEventListener('order-cancelled', (event: MessageEvent) => {
-            try {
-                const cancelled = JSON.parse(event.data);
-                const sid = String(cancelled.id);
-                setOrdersMap(prev => { const next = new Map(prev); next.delete(sid); return next; });
-                toast.warning(t("manager.orderCancelled", { code: cancelled.displayCode }));
-            } catch (err) {
-                console.error("Error parsing order-cancelled event:", err);
-            }
-        });
-
-        eventSource.onerror = () => { console.error("SSE connection error"); };
-
-        return () => { eventSource.close(); };
+        return () => { close(); };
     }, [fetchOrders]);
 
     const updateOrderStatus = async (orderId: string, newStatus: Status, stationId?: string) => {

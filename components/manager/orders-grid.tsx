@@ -4,7 +4,25 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect } from "react";
 import { NUMBER_DISPLAY_KEY, TICKET_NUMBER_MAX_KEY } from "@/components/settings/NumberDisplaySettingsCard";
-import type { NumberDisplay } from "@/lib/display-config-store";
+import type { DisplayConfig, NumberDisplay } from "@/lib/display-config-store";
+
+// Ogni OrderCard leggeva la config con una fetch propria: con N card a schermo
+// (e a ogni rimontaggio della griglia) partiva una raffica di richieste.
+// Una promessa condivisa con TTL collassa tutto in una richiesta ogni 5s.
+const CONFIG_TTL_MS = 5000;
+let configPromise: Promise<Partial<DisplayConfig> | null> | null = null;
+let configFetchedAt = 0;
+
+function fetchDisplayConfig(): Promise<Partial<DisplayConfig> | null> {
+    const now = Date.now();
+    if (!configPromise || now - configFetchedAt > CONFIG_TTL_MS) {
+        configFetchedAt = now;
+        configPromise = fetch("/api/display-config")
+            .then(res => res.ok ? res.json() : null)
+            .catch(err => { configPromise = null; throw err; });
+    }
+    return configPromise;
+}
 
 interface OrdersGridProps {
     className?: string;
@@ -63,8 +81,7 @@ export function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
     const [ticketNumberMax, setTicketNumberMax] = useState<number>(0);
 
     useEffect(() => {
-        fetch("/api/display-config")
-            .then(res => res.ok ? res.json() : null)
+        fetchDisplayConfig()
             .then(cfg => {
                 if (!cfg) {
                     const nd = localStorage.getItem(NUMBER_DISPLAY_KEY) as NumberDisplay | null;
