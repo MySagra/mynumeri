@@ -1,7 +1,7 @@
-import { getConfig, updateConfig, type DisplayMode, type NumberDisplay } from "@/lib/display-config-store";
+import { getConfig, updateConfig, type DisplayMode } from "@/lib/display-config-store";
 
 export async function GET() {
-    return Response.json(getConfig());
+    return Response.json({ ...getConfig(), showNumbers: process.env.SHOW_NUMBERS === "true" });
 }
 
 export async function PATCH(request: Request) {
@@ -12,15 +12,6 @@ export async function PATCH(request: Request) {
     if (typeof body.eventName === "string") patch.eventName = body.eventName;
     if (["ready", "preparing", "hybrid"].includes(body.displayMode)) {
         patch.displayMode = body.displayMode as DisplayMode;
-    }
-    if (["displayCode", "ticketNumber"].includes(body.numberDisplay)) {
-        patch.numberDisplay = body.numberDisplay as NumberDisplay;
-    }
-    if (typeof body.ticketNumberMax === "number" && body.ticketNumberMax >= 0) {
-        patch.ticketNumberMax = Math.floor(body.ticketNumberMax);
-    }
-    if (typeof body.stationsEnabled === "boolean") {
-        patch.stationsEnabled = body.stationsEnabled;
     }
     if (typeof body.fullscreenAlertEnabled === "boolean") {
         patch.fullscreenAlertEnabled = body.fullscreenAlertEnabled;

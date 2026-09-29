@@ -18,18 +18,18 @@ export function AppearanceSettingsCard() {
     const darkVariant = mounted && theme === 'dark' ? 'default' : 'outline';
 
     return (
-        <Card>
-            <CardHeader>
+        <Card className="gap-4 rounded-2xl border-border/70 py-4 shadow-sm">
+            <CardHeader className="gap-1 px-4 sm:px-5">
                 <div className="flex items-center gap-2">
-                    <Palette className="h-5 w-5 text-amber-600" />
+                    <Palette className="h-5 w-5 text-amber-500" />
                     <CardTitle className='select-none'>{t("settings.appearance")}</CardTitle>
                 </div>
                 <CardDescription className='select-none'>
                     {t("settings.appearanceDesc")}
                 </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <CardContent className="px-4 sm:px-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-0.5">
                         <Label>{t("settings.theme")}</Label>
                         <div className="text-sm text-muted-foreground select-none">
@@ -40,7 +40,7 @@ export function AppearanceSettingsCard() {
                         <Button
                             variant={lightVariant}
                             size="sm"
-                            className='select-none'
+                            className='min-w-24 select-none'
                             onClick={() => setTheme('light')}
                         >
                             <Sun className="h-4 w-4 mr-2" />
@@ -49,7 +49,7 @@ export function AppearanceSettingsCard() {
                         <Button
                             variant={darkVariant}
                             size="sm"
-                            className='select-none'
+                            className='min-w-24 select-none'
                             onClick={() => setTheme('dark')}
                         >
                             <Moon className="h-4 w-4 mr-2" />

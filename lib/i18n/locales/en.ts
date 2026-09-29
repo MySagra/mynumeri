@@ -1,7 +1,11 @@
 export const en = {
   translation: {
     common: {
-      poweredBy: "Powered by"
+      poweredBy: "Powered by",
+      noPickupStations: "No pickup stations configured",
+      configurePickupStations: "Go to the admin panel and set up pickup stations to start managing orders.",
+      refreshStations: "Refresh stations",
+      refreshingStations: "Refreshing..."
     },
     login: {
       welcome: "Welcome!",
@@ -62,7 +66,7 @@ export const en = {
       displayModePrep: "Preparing only",
       displayModePrepDesc: "Shows only orders currently in preparation",
       displayModeHybrid: "Hybrid view",
-      displayModeHybridDesc: "¾ of the page for preparing orders and ¼ for ready orders",
+      displayModeHybridDesc: "Preparing and ready orders for each station (up to 3 stations)",
       display: "Display",
       displayDesc: "Edit the display page",
       displayOptions: "Display options",
@@ -80,27 +84,12 @@ export const en = {
       eventNameSaved: "Event name saved",
       settings: "Settings",
       backToManager: "Back to Manager",
-      numberDisplay: "Order number display",
-      numberDisplayDesc: "Choose whether to show the display code or the ticket's progressive number",
-      numberDisplayCode: "Display code",
-      numberDisplayCodeDesc: "Shows the alphanumeric code assigned to the order",
-      numberDisplayTicket: "Ticket number",
-      numberDisplayTicketDesc: "Shows the progressive ticket number",
-      ticketNumberMax: "Number limit",
-      ticketNumberMaxDesc: "Enable to cap numbers from 0 to limit value (exclusive)",
-      ticketNumberMaxLabel: "Limit value:",
-      ticketNumberMaxPlaceholder: "e.g. 100",
-      numberDisplaySaved: "Number display setting saved",
-      stations: "Stations",
-      stationsDesc: "Enable pickup station management (kitchen, grill, etc.)",
-      stationsEnabled: "Enable stations",
-      stationsSaved: "Stations setting saved",
       fullscreenAlertEnabled: "Full-screen alert",
       fullscreenAlertEnabledDesc: "Show a full-screen overlay when an order is ready",
       autoScrollPagesEnabled: "Auto-scroll pages",
       autoScrollPagesEnabledDesc: "Automatically scroll through order pages every 10 seconds",
       displayZoom: "Display zoom",
-      displayZoomDesc: "Zoom in or out to see more or fewer orders",
+      displayZoomDesc: "Adjust the size of numbers on the public display",
       zoomSaved: "Display zoom saved",
       allOrders: "All orders"
     },

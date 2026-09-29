@@ -1,7 +1,11 @@
 export const it = {
   translation: {
     common: {
-      poweredBy: "Powered by"
+      poweredBy: "Powered by",
+      noPickupStations: "Nessuna postazione di ritiro configurata",
+      configurePickupStations: "Vai al pannello amministratore e imposta le postazioni di ritiro per iniziare a gestire gli ordini.",
+      refreshStations: "Ricarica postazioni",
+      refreshingStations: "Aggiornamento..."
     },
     login: {
       welcome: "Benvenuto!",
@@ -62,7 +66,7 @@ export const it = {
       displayModePrep: "Solo in preparazione",
       displayModePrepDesc: "Mostra solo gli ordini attualmente in preparazione",
       displayModeHybrid: "Vista ibrida",
-      displayModeHybridDesc: "¾ della pagina per gli ordini in preparazione e ¼ per gli ordini pronti",
+      displayModeHybridDesc: "Preparazione e ritiro per ogni postazione (fino a 3 postazioni)",
       display: "Display",
       displayDesc: "Modifica la pagina del display",
       displayOptions: "Opzioni display",
@@ -80,27 +84,12 @@ export const it = {
       eventNameSaved: "Nome evento salvato",
       settings: "Impostazioni",
       backToManager: "Torna al Manager",
-      numberDisplay: "Visualizzazione numero ordine",
-      numberDisplayDesc: "Scegli se mostrare il codice display o il numero progressivo del ticket",
-      numberDisplayCode: "Codice display",
-      numberDisplayCodeDesc: "Mostra il codice alfanumerico assegnato all'ordine",
-      numberDisplayTicket: "Numero ticket",
-      numberDisplayTicketDesc: "Mostra il numero progressivo del ticket",
-      ticketNumberMax: "Limite numero",
-      ticketNumberMaxDesc: "Attiva per limitare i numeri mostrati che vanno da 0 al numero limite (escluso)",
-      ticketNumberMaxLabel: "Valore limite:",
-      ticketNumberMaxPlaceholder: "es. 100",
-      numberDisplaySaved: "Impostazione visualizzazione salvata",
-      stations: "Postazioni",
-      stationsDesc: "Abilita la gestione delle postazioni di ritiro (cucina, griglia, ecc.)",
-      stationsEnabled: "Abilita postazioni",
-      stationsSaved: "Impostazione postazioni salvata",
       fullscreenAlertEnabled: "Alert a tutto schermo",
       fullscreenAlertEnabledDesc: "Mostra un overlay a tutto schermo quando un ordine è pronto",
       autoScrollPagesEnabled: "Scorrimento automatico pagine",
       autoScrollPagesEnabledDesc: "Scorre automaticamente le pagine di ordini ogni 10 secondi",
       displayZoom: "Zoom del display",
-      displayZoomDesc: "Zoom in o out per vedere più o meno ordini",
+      displayZoomDesc: "Regola la dimensione dei numeri sul display pubblico",
       zoomSaved: "Zoom del display salvato",
       allOrders: "Tutti gli ordini"
     },

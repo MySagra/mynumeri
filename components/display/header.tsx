@@ -1,13 +1,7 @@
 import { Logo } from "../icons/logo";
 import { useTranslation } from "react-i18next";
 
-const PAGE_INTERVAL_MS = 10000;
-
 interface HeaderProps {
-    pageKey: number;
-    showProgress: boolean;
-    currentPage: number;
-    totalPages: number;
     title?: string;
     eventName?: string;
 }
@@ -18,7 +12,7 @@ function LogoIcon() {
     );
 }
 
-export function Header({ pageKey, showProgress, currentPage, totalPages, title, eventName }: HeaderProps) {
+export function Header({ title, eventName }: HeaderProps) {
     const { t } = useTranslation();
     const finalTitle = title || t("display.ordersReady");
     return (
@@ -37,33 +31,9 @@ export function Header({ pageKey, showProgress, currentPage, totalPages, title, 
                     </h1>
                 </div>
 
-                {showProgress && (
-                    <div className="flex items-center gap-2 bg-black/10 rounded-xl px-5 py-2">
-                        <span className="text-black font-black text-2xl select-none tabular-nums leading-none">
-                            {currentPage + 1}
-                        </span>
-                        <span className="text-black/50 font-bold text-base select-none leading-none">
-                            /
-                        </span>
-                        <span className="text-black font-black text-2xl select-none tabular-nums leading-none">
-                            {totalPages}
-                        </span>
-                    </div>
-                )}
             </div>
 
-            {/* Progress bar */}
-            <div className="h-2.5 w-full bg-black/10">
-                {showProgress && (
-                    <div
-                        key={pageKey}
-                        className="h-full bg-black/90 rounded-r-full origin-left"
-                        style={{
-                            animation: `progress-bar-fill ${PAGE_INTERVAL_MS}ms linear forwards`,
-                        }}
-                    />
-                )}
-            </div>
+            <div className="h-2.5 w-full bg-black/10" />
         </header>
     );
 }

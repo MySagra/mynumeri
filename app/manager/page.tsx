@@ -1,16 +1,16 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/manager/header";
-import OrdersGrid from "@/components/manager/orders-grid";
-import { PickedUpOrdersSheet } from "@/components/manager/picked-up-orders-sheet";
 import { StationCard } from "@/components/manager/StationCard";
+import { EmptyStations } from "@/components/empty-stations";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { apiFetch, handleApiError } from "@/lib/api";
 import { subscribeSSE } from "@/lib/sse";
 import { resolveOrderEventType, statusForOrderEvent } from "@/lib/order-events";
+import { withMinimumDelay } from "@/lib/minimum-delay";
 
 function getWorkdayBounds() {
     const now = new Date();
@@ -41,40 +41,9 @@ export default function Manager() {
 
     // Station config
     const [stations, setStations] = useState<Station[]>([]);
-    const [stationsEnabled, setStationsEnabled] = useState(false);
-    const stationsEnabledRef = useRef(false);
-
-    // Con le postazioni disattivate il backend non popola `orderStationStates`:
-    // filtrare su quell'array nasconderebbe tutti gli ordini.
-    const hasStationStates = useCallback(
-        (o: Order) => !stationsEnabled || (o.orderStationStates ?? []).length > 0,
-        [stationsEnabled]
-    );
-
-    // --- Derived lists: normal mode ---
-    const confirmedOrders = useMemo(() =>
-        Array.from(ordersMap.values()).filter(o =>
-            hasStationStates(o) &&
-            (o.status === 'CONFIRMED' || o.status === 'PARTIAL')
-        ),
-        [ordersMap, hasStationStates]
-    );
-
-    const readyOrders = useMemo(() =>
-        Array.from(ordersMap.values()).filter(o =>
-            hasStationStates(o) && o.status === 'COMPLETED'
-        ),
-        [ordersMap, hasStationStates]
-    );
-
-    const pickedUpOrders = useMemo(() =>
-        Array.from(ordersMap.values()).filter(o =>
-            hasStationStates(o) && o.status === 'PICKED_UP'
-        ),
-        [ordersMap, hasStationStates]
-    );
-
-    // --- Derived maps: station mode ---
+    const [stationsLoaded, setStationsLoaded] = useState(false);
+    const [refreshingStations, setRefreshingStations] = useState(false);
+    // --- Orders grouped by station ---
     const stationConfirmed = useMemo(() => {
         const map: Record<string, Order[]> = {};
         for (const s of stations) map[s.id] = [];
@@ -109,7 +78,7 @@ export default function Manager() {
     }, [ordersMap, stations]);
 
     // Flat deduped picked-up list for the header in station mode
-    const stationModePickedUpOrders = useMemo(() => {
+    const pickedUpOrders = useMemo(() => {
         const seen = new Set<string>();
         const result: Order[] = [];
         for (const list of Object.values(stationPickedUp))
@@ -137,30 +106,30 @@ export default function Manager() {
             const { dateFrom, dateTo } = getWorkdayBounds();
             const dateParams = `&dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`;
             const orders = await fetchAllPages(`${dateParams}&include=ordersStationsStates`);
-            setOrdersMap(new Map(orders.map(o => [o.id, o])));
+            setOrdersMap(new Map(orders.filter(o => (o.orderStationStates ?? []).length > 0).map(o => [o.id, o])));
         } catch (error) {
             if (handleApiError(error, router)) return;
             console.error("Failed to fetch orders:", error);
         }
     }, [router]);
 
-    // Fetch display config + stations on mount
-    useEffect(() => {
-        fetch("/api/display-config")
-            .then(res => res.ok ? res.json() : null)
-            .then(async cfg => {
-                if (cfg?.stationsEnabled) {
-                    stationsEnabledRef.current = true;
-                    setStationsEnabled(true);
-                    const data = await apiFetch<Station[]>("/api/stations");
-                    if (Array.isArray(data)) {
-                        setStations(data);
-                        fetchOrders();
-                    }
-                }
-            })
-            .catch(err => { if (!handleApiError(err, router)) console.error(err); });
-    }, [router]);
+    const fetchStations = useCallback(async () => {
+        setRefreshingStations(true);
+        try {
+            const data = await withMinimumDelay(apiFetch<Station[]>("/api/stations"), 200);
+            if (Array.isArray(data)) {
+                setStations(data);
+                setStationsLoaded(true);
+                if (data.length > 0) await fetchOrders();
+            }
+        } catch (err) {
+            if (!handleApiError(err, router)) console.error("Failed to fetch stations:", err);
+        } finally {
+            setRefreshingStations(false);
+        }
+    }, [fetchOrders, router]);
+
+    useEffect(() => { void fetchStations(); }, [fetchStations]);
 
     // SSE setup
     useEffect(() => {
@@ -169,12 +138,10 @@ export default function Manager() {
         const handleConfirmedOrder = (data: unknown, _frame?: unknown, type = 'confirmed-order') => {
             try {
                 const raw = toOrder(data as Order);
-                // Con le postazioni attive un ordine senza stazioni non è di competenza del manager
-                if (stationsEnabledRef.current && (raw.ordersStations ?? []).length === 0) return;
+                if (!(raw.ordersStations?.length || raw.orderStationStates?.length)) return;
                 // Il payload dell'evento non porta `status`: lo si deduce dal tipo evento
                 const status = raw.status ?? statusForOrderEvent(type) ?? 'CONFIRMED';
-                // Postazioni attive: la UI legge gli station states, sintetizzati se assenti.
-                // Postazioni disattive: resta vuoto e conta lo `status` a livello ordine.
+                // Il payload SSE può contenere solo gli ID delle postazioni.
                 const orderStationStates = (raw.orderStationStates ?? []).length > 0
                     ? raw.orderStationStates!
                     : (raw.ordersStations ?? []).map(stId => ({ stationId: stId, status }));
@@ -204,18 +171,15 @@ export default function Manager() {
                             if (!existing) return prev;
 
                             let orderStationStates = existing.orderStationStates;
-                            // In station mode, propagate order-level status to station states.
-                            // This handles header undo ops that PATCH order-level (no stationId).
-                            if (stationsEnabledRef.current) {
-                                if (status === 'COMPLETED') {
-                                    orderStationStates = (orderStationStates ?? []).map(s =>
-                                        s.status === 'PICKED_UP' ? { ...s, status: 'COMPLETED' } : s
-                                    );
-                                } else if (status === 'CONFIRMED') {
-                                    orderStationStates = (orderStationStates ?? []).map(s =>
-                                        s.status === 'COMPLETED' ? { ...s, status: 'CONFIRMED' } : s
-                                    );
-                                }
+                            // The header undo PATCH targets the whole order.
+                            if (status === 'COMPLETED') {
+                                orderStationStates = (orderStationStates ?? []).map(s =>
+                                    s.status === 'PICKED_UP' ? { ...s, status: 'COMPLETED' } : s
+                                );
+                            } else if (status === 'CONFIRMED') {
+                                orderStationStates = (orderStationStates ?? []).map(s =>
+                                    s.status === 'COMPLETED' ? { ...s, status: 'CONFIRMED' } : s
+                                );
                             }
 
                             return new Map(prev).set(String(id), {
@@ -263,7 +227,7 @@ export default function Manager() {
         });
 
         return () => { close(); };
-    }, [fetchOrders]);
+    }, [fetchOrders, t]);
 
     const updateOrderStatus = async (orderId: string, newStatus: Status, stationId?: string) => {
         try {
@@ -281,7 +245,7 @@ export default function Manager() {
         }
     };
 
-    // --- Station mode handlers ---
+    // --- Station handlers ---
     const handleStationMarkDone = (order: Order, stationId: string) => {
         setOrdersMap(prev => {
             const current = prev.get(order.id) ?? order;
@@ -332,45 +296,15 @@ export default function Manager() {
         updateOrderStatus(order.id, 'COMPLETED', stationId);
     };
 
-    // --- Normal mode handlers ---
-    const handleConfirmToComplete = (order: Order) => {
-        setOrdersMap(prev => {
-            const current = prev.get(order.id) ?? order;
-            return new Map(prev).set(order.id, { ...current, status: 'COMPLETED' });
-        });
-        updateOrderStatus(order.id, 'COMPLETED');
-    };
-
-    const handleCompleteToConfirm = (order: Order) => {
-        setOrdersMap(prev => {
-            const current = prev.get(order.id) ?? order;
-            return new Map(prev).set(order.id, { ...current, status: 'CONFIRMED' });
-        });
-        updateOrderStatus(order.id, 'CONFIRMED');
-    };
-
-    const handleCompleteToPickup = (order: Order) => {
-        setOrdersMap(prev => {
-            const current = prev.get(order.id) ?? order;
-            return new Map(prev).set(order.id, { ...current, status: 'PICKED_UP' });
-        });
-        updateOrderStatus(order.id, 'PICKED_UP');
-    };
-
-    const handlePickupToComplete = (order: Order) => {
-        setOrdersMap(prev => {
-            const current = prev.get(order.id) ?? order;
-            return new Map(prev).set(order.id, { ...current, status: 'COMPLETED' });
-        });
-        updateOrderStatus(order.id, 'COMPLETED');
-    };
-
-    // --- Stations layout ---
-    if (stationsEnabled && stations.length > 0) {
-        return (
-            <div className="h-screen w-full flex flex-col overflow-hidden">
-                <Header pickedUpOrders={stationModePickedUpOrders} onPickupPrev={handlePickupToCompleteStation} />
-                <main className="flex-1 w-full overflow-hidden">
+    return (
+        <div className="h-screen w-full flex flex-col overflow-hidden">
+            <Header pickedUpOrders={pickedUpOrders} onPickupPrev={handlePickupToCompleteStation} />
+            <main className="flex-1 w-full overflow-hidden">
+                {stationsLoaded && stations.length === 0 ? (
+                    <div className="flex h-full items-center justify-center px-4 pt-16">
+                        <EmptyStations onRefresh={() => { void fetchStations(); }} refreshing={refreshingStations} />
+                    </div>
+                ) : (
                     <div className="h-full w-full flex gap-3 p-3 pt-20 md:pt-24 max-w-[1920px] mx-auto overflow-x-auto">
                         {stations.map(station => (
                             <StationCard
@@ -388,40 +322,7 @@ export default function Manager() {
                             />
                         ))}
                     </div>
-                </main>
-            </div>
-        );
-    }
-
-    // --- Normal layout ---
-    return (
-        <div className="h-screen w-full flex flex-col overflow-hidden">
-            <Header pickedUpOrders={pickedUpOrders} onPickupPrev={handlePickupToComplete} />
-            <main className="flex-1 w-full overflow-hidden">
-                <div className="h-full w-full flex flex-col md:grid md:grid-cols-3 gap-3 p-3 pt-20 md:pt-24 max-w-[1920px] mx-auto">
-                    <OrdersGrid
-                        status="CONFIRMED"
-                        className="flex-1 min-h-0 min-w-0 md:flex-none md:col-span-2 md:h-full"
-                        orders={confirmedOrders}
-                        title={t("manager.preparingOrders")}
-                        onNext={handleConfirmToComplete}
-                    />
-                    <OrdersGrid
-                        status="COMPLETED"
-                        className="flex-1 min-h-0 min-w-0 md:flex-none md:col-span-1 md:h-full"
-                        orders={readyOrders}
-                        title={t("manager.readyOrders")}
-                        onPrev={handleCompleteToConfirm}
-                        onNext={handleCompleteToPickup}
-                    >
-                        <div className="hidden md:block">
-                            <PickedUpOrdersSheet
-                                pickedUpOrders={pickedUpOrders}
-                                onPrev={handlePickupToComplete}
-                            />
-                        </div>
-                    </OrdersGrid>
-                </div>
+                )}
             </main>
         </div>
     );

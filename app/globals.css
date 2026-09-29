@@ -128,6 +128,7 @@
 
 .order-card--exit {
   animation: order-card-exit 200ms ease forwards;
+  pointer-events: none;
 }
 
 @keyframes order-card-enter {
@@ -150,6 +151,10 @@
     opacity: 0;
     transform: translateY(-6px) scale(0.98);
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .order-card, .order-card--exit { animation: none; }
 }
 
 @keyframes progress-bar-fill {
