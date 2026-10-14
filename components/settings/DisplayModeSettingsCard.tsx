@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Monitor, AlertCircle, Play, Grid2x2, ZoomIn, ZoomOut } from "lucide-react";
+import { Monitor, AlertCircle, Play, ZoomIn, ZoomOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
@@ -21,8 +21,6 @@ export function DisplayModeSettingsCard() {
     const { t } = useTranslation();
     const [mode, setMode] = useState<DisplayMode>("ready");
     const [savedMode, setSavedMode] = useState<DisplayMode>("ready");
-    const [stationsEnabled, setStationsEnabled] = useState(false);
-    const [savedStationsEnabled, setSavedStationsEnabled] = useState(false);
     const [fullscreenAlertEnabled, setFullscreenAlertEnabled] = useState(true);
     const [savedFullscreenAlertEnabled, setSavedFullscreenAlertEnabled] = useState(true);
     const [autoScrollPagesEnabled, setAutoScrollPagesEnabled] = useState(true);
@@ -66,10 +64,6 @@ export function DisplayModeSettingsCard() {
                         setSavedMode(stored);
                     }
                 }
-                if (typeof cfg?.stationsEnabled === "boolean") {
-                    setStationsEnabled(cfg.stationsEnabled);
-                    setSavedStationsEnabled(cfg.stationsEnabled);
-                }
                 if (typeof cfg?.fullscreenAlertEnabled === "boolean") {
                     setFullscreenAlertEnabled(cfg.fullscreenAlertEnabled);
                     setSavedFullscreenAlertEnabled(cfg.fullscreenAlertEnabled);
@@ -100,10 +94,9 @@ export function DisplayModeSettingsCard() {
             await fetch("/api/display-config", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ displayMode: mode, stationsEnabled, fullscreenAlertEnabled, autoScrollPagesEnabled, displayZoom }),
+                body: JSON.stringify({ displayMode: mode, fullscreenAlertEnabled, autoScrollPagesEnabled, displayZoom }),
             });
             setSavedMode(mode);
-            setSavedStationsEnabled(stationsEnabled);
             setSavedFullscreenAlertEnabled(fullscreenAlertEnabled);
             setSavedAutoScrollPagesEnabled(autoScrollPagesEnabled);
             setSavedDisplayZoom(displayZoom);
@@ -119,50 +112,51 @@ export function DisplayModeSettingsCard() {
 
     const hasChanges =
         mode !== savedMode ||
-        stationsEnabled !== savedStationsEnabled ||
         fullscreenAlertEnabled !== savedFullscreenAlertEnabled ||
         autoScrollPagesEnabled !== savedAutoScrollPagesEnabled ||
         displayZoom !== savedDisplayZoom;
 
     return (
-        <Card>
-            <CardHeader>
+        <Card className="gap-4 rounded-2xl border-border/70 py-4 shadow-sm">
+            <CardHeader className="gap-1 px-4 sm:px-5">
                 <div className="flex items-center gap-2 select-none">
-                    <Monitor className="h-5 w-5 text-amber-600" />
+                    <Monitor className="h-5 w-5 text-amber-500" />
                     <CardTitle>{t("settings.display")}</CardTitle>
                 </div>
                 <CardDescription className="select-none">
                     {t("settings.displayDesc")}
                 </CardDescription>
             </CardHeader>
-            <CardContent>
-                <Label htmlFor="event-name">{t("settings.operativeMode")}</Label>
-                <div className="text-sm text-muted-foreground select-none mb-2">
+            <CardContent className="px-4 sm:px-5">
+                <Label id="operative-mode-label" className="text-sm font-medium">{t("settings.operativeMode")}</Label>
+                <div className="mb-3 text-sm text-muted-foreground select-none">
                     {t("settings.operativeModeDesc")}
                 </div>
                 {isLoading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         <Skeleton className="h-20 rounded-xl" />
                         <Skeleton className="h-20 rounded-xl" />
                         <Skeleton className="h-20 rounded-xl" />
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div role="group" aria-labelledby="operative-mode-label" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         {MODES.map(({ value, label, description }) => (
                             <button
                                 key={value}
+                                type="button"
                                 onClick={() => setMode(value)}
+                                aria-pressed={mode === value}
                                 className={cn(
-                                    "flex flex-col gap-1.5 rounded-xl border-2 p-4 text-left transition-all cursor-pointer",
+                                    "flex flex-col gap-1 rounded-lg border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                     mode === value
-                                        ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30"
-                                        : "border-border hover:border-amber-300 hover:bg-muted/50"
+                                        ? "border-primary/60 bg-primary/10"
+                                        : "border-border bg-muted/30 hover:bg-muted/70"
                                 )}
                             >
                                 <span
                                     className={cn(
                                         "font-semibold text-sm",
-                                        mode === value ? "text-amber-700 dark:text-amber-400" : ""
+                                        mode === value ? "text-foreground" : ""
                                     )}
                                 >
                                     {label}
@@ -175,17 +169,20 @@ export function DisplayModeSettingsCard() {
                     </div>
                 )}
 
-                <div className="mt-8 space-y-6">
-                    {/* Zoom Section */}
+                <div className="mt-6 space-y-6">
                     <div className="space-y-3">
-                        <Label className="text-sm font-semibold">{t("settings.displayZoom")}</Label>
+                        <div>
+                            <Label htmlFor="display-zoom" className="text-sm font-medium">{t("settings.displayZoom")}</Label>
+                            <p className="text-sm text-muted-foreground">{t("settings.displayZoomDesc")}</p>
+                        </div>
                         {isLoading ? (
                             <Skeleton className="h-16 rounded-lg" />
                         ) : (
-                            <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100 dark:border-blue-900/50">
-                                <div className="flex items-center justify-center gap-3">
-                                    <ZoomOut className="h-4 w-4 text-blue-600" />
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-3 rounded-lg border border-border/70 bg-muted/50 p-3">
+                                    <ZoomOut className="h-4 w-4 shrink-0 text-amber-500" />
                                     <input
+                                        id="display-zoom"
                                         type="range"
                                         min="50"
                                         max="200"
@@ -193,56 +190,33 @@ export function DisplayModeSettingsCard() {
                                         value={displayZoom}
                                         onChange={(e) => setDisplayZoom(parseInt(e.target.value, 10))}
                                         disabled={isLoading}
-                                        className="flex-1 h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer dark:bg-blue-800"
-                                        style={{
-                                            background: `linear-gradient(to right, rgb(96, 165, 250) 0%, rgb(96, 165, 250) ${((displayZoom - 50) / 150) * 100}%, rgb(229, 231, 235) ${((displayZoom - 50) / 150) * 100}%, rgb(229, 231, 235) 100%)`
-                                        }}
+                                        className="h-2 min-w-0 flex-1 cursor-pointer accent-amber-500"
                                     />
-                                    <ZoomIn className="h-4 w-4 text-blue-600" />
-                                    <input
-                                        type="number"
-                                        min="50"
-                                        max="200"
-                                        value={displayZoom}
-                                        onChange={(e) => {
-                                            const val = parseInt(e.target.value, 10);
-                                            if (!isNaN(val) && val >= 50 && val <= 200) {
-                                                setDisplayZoom(val);
-                                            }
-                                        }}
-                                        disabled={isLoading}
-                                        className="w-14 h-8 rounded px-2 text-sm font-bold text-center text-blue-700 dark:text-blue-400 bg-white dark:bg-blue-900/50 border border-blue-200 dark:border-blue-800 tabular-nums"
-                                    />
-                                    <span className="text-sm font-medium text-blue-700 dark:text-blue-400">%</span>
+                                    <ZoomIn className="h-4 w-4 shrink-0 text-amber-500" />
+                                    <output htmlFor="display-zoom" className="w-12 text-right text-sm font-semibold tabular-nums">{displayZoom}%</output>
                                 </div>
                                 <div className="grid grid-cols-3 gap-2">
                                     <button
+                                        type="button"
+                                        aria-pressed={displayZoom === 50}
                                         onClick={() => setDisplayZoom(50)}
-                                        className={`py-1.5 px-2 rounded text-xs font-semibold transition-colors ${
-                                            displayZoom === 50
-                                                ? "bg-blue-600 text-white"
-                                                : "bg-blue-200 dark:bg-blue-900 text-blue-900 dark:text-blue-100 hover:bg-blue-300 dark:hover:bg-blue-800"
-                                        }`}
+                                        className={cn("rounded-md border px-2 py-1.5 text-xs font-medium transition-colors", displayZoom === 50 ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted/50 hover:bg-muted")}
                                     >
                                         50%
                                     </button>
                                     <button
+                                        type="button"
+                                        aria-pressed={displayZoom === 100}
                                         onClick={() => setDisplayZoom(100)}
-                                        className={`py-1.5 px-2 rounded text-xs font-semibold transition-colors ${
-                                            displayZoom === 100
-                                                ? "bg-blue-600 text-white"
-                                                : "bg-blue-200 dark:bg-blue-900 text-blue-900 dark:text-blue-100 hover:bg-blue-300 dark:hover:bg-blue-800"
-                                        }`}
+                                        className={cn("rounded-md border px-2 py-1.5 text-xs font-medium transition-colors", displayZoom === 100 ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted/50 hover:bg-muted")}
                                     >
                                         100%
                                     </button>
                                     <button
+                                        type="button"
+                                        aria-pressed={displayZoom === 200}
                                         onClick={() => setDisplayZoom(200)}
-                                        className={`py-1.5 px-2 rounded text-xs font-semibold transition-colors ${
-                                            displayZoom === 200
-                                                ? "bg-blue-600 text-white"
-                                                : "bg-blue-200 dark:bg-blue-900 text-blue-900 dark:text-blue-100 hover:bg-blue-300 dark:hover:bg-blue-800"
-                                        }`}
+                                        className={cn("rounded-md border px-2 py-1.5 text-xs font-medium transition-colors", displayZoom === 200 ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted/50 hover:bg-muted")}
                                     >
                                         200%
                                     </button>
@@ -251,16 +225,17 @@ export function DisplayModeSettingsCard() {
                         )}
                     </div>
 
-                    {/* Flags Grid 2x2 */}
+                    {/* Display options */}
                     <div className="space-y-3">
                         <Label className="text-sm font-semibold">{t("settings.displayOptions")}</Label>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50">
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
-                                    <Label htmlFor="fullscreen-alert-enabled" className="cursor-pointer select-none text-sm font-medium truncate">
-                                        {t("settings.fullscreenAlertEnabled")}
-                                    </Label>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/50 p-3">
+                                <div className="min-w-0 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
+                                        <Label htmlFor="fullscreen-alert-enabled" className="cursor-pointer text-sm font-medium">{t("settings.fullscreenAlertEnabled")}</Label>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">{t("settings.fullscreenAlertEnabledDesc")}</p>
                                 </div>
                                 <Switch
                                     id="fullscreen-alert-enabled"
@@ -269,12 +244,13 @@ export function DisplayModeSettingsCard() {
                                     disabled={isLoading}
                                 />
                             </div>
-                            <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-100 dark:border-green-900/50">
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    <Play className="h-4 w-4 text-green-600 shrink-0" />
-                                    <Label htmlFor="auto-scroll-pages-enabled" className="cursor-pointer select-none text-sm font-medium truncate">
-                                        {t("settings.autoScrollPagesEnabled")}
-                                    </Label>
+                            <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/50 p-3">
+                                <div className="min-w-0 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <Play className="h-4 w-4 shrink-0 text-amber-500" />
+                                        <Label htmlFor="auto-scroll-pages-enabled" className="cursor-pointer text-sm font-medium">{t("settings.autoScrollPagesEnabled")}</Label>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">{t("settings.autoScrollPagesEnabledDesc")}</p>
                                 </div>
                                 <Switch
                                     id="auto-scroll-pages-enabled"
@@ -283,25 +259,11 @@ export function DisplayModeSettingsCard() {
                                     disabled={isLoading}
                                 />
                             </div>
-                            <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/50">
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    <Grid2x2 className="h-4 w-4 text-purple-600 shrink-0" />
-                                    <Label htmlFor="stations-enabled" className="cursor-pointer select-none text-sm font-medium truncate">
-                                        {t("settings.stationsEnabled")}
-                                    </Label>
-                                </div>
-                                <Switch
-                                    id="stations-enabled"
-                                    checked={stationsEnabled}
-                                    onCheckedChange={setStationsEnabled}
-                                    disabled={isLoading}
-                                />
-                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex justify-end mt-4">
+                <div className="mt-5 flex justify-end border-t border-border/70 pt-4">
                     <Button onClick={handleSave} disabled={!hasChanges || isSaving || isLoading}>
                         {isSaving ? t("settings.saving") : t("settings.save")}
                     </Button>

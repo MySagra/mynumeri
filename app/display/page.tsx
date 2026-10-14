@@ -1,26 +1,22 @@
 "use client";
 
 import { Header } from "@/components/display/header";
+import { EmptyStations } from "@/components/empty-stations";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getWorkdayBounds, sortByDate } from "@/utils/utils";
 import { type DisplayMode, DISPLAY_MODE_KEY } from "@/components/settings/DisplayModeSettingsCard";
 import { EVENT_NAME_KEY } from "@/components/settings/GeneralSettingsCard";
-import { NUMBER_DISPLAY_KEY, TICKET_NUMBER_MAX_KEY } from "@/components/settings/NumberDisplaySettingsCard";
 import { DISPLAY_ZOOM_KEY } from "@/components/settings/DisplayZoomSettingsCard";
-import type { DisplayConfig, NumberDisplay } from "@/lib/display-config-store";
+import type { DisplayConfig } from "@/lib/display-config-store";
 import { useTranslation } from "react-i18next";
 import { apiFetch, handleApiError } from "@/lib/api";
 import { subscribeSSE } from "@/lib/sse";
 import { resolveOrderEventType, statusForOrderEvent } from "@/lib/order-events";
+import { withMinimumDelay } from "@/lib/minimum-delay";
+import { useAnimatedOrders } from "@/hooks/use-animated-orders";
 
-const CARDS_PER_PAGE = 40;
 const PAGE_INTERVAL = 10000;
-
-const HYBRID_PREP_COLS = 4;
-const HYBRID_PREP_ROWS = 4;
-const HYBRID_READY_COLS = 2;
-const HYBRID_READY_ROWS = 4;
 
 // Stations display constants
 const STATION_COLS = 2;
@@ -101,7 +97,7 @@ function OrderCard({ order, getOrderLabel, cardBgClass = "bg-white" }: {
     cardBgClass?: string;
 }) {
     return (
-        <div className={`${cardBgClass} border-2 border-gray-200 rounded-2xl flex items-center justify-center shadow-sm p-3`} style={{ containerType: "size" }}>
+        <div className={`h-full ${cardBgClass} border-2 border-gray-200 rounded-2xl flex items-center justify-center shadow-sm p-3`} style={{ containerType: "size" }}>
             <p className="font-black font-mono text-black select-none leading-none" style={{ fontSize: "min(50cqw, 90cqh)" }}>
                 {getOrderLabel(order)}
             </p>
@@ -198,6 +194,7 @@ function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, s
     }, [currentPage, totalPages, autoScrollEnabled]);
 
     const pageOrders = displayedOrders.slice(currentPage * cardsPerPage, (currentPage + 1) * cardsPerPage);
+    const animatedOrders = useAnimatedOrders(pageOrders, String(currentPage));
 
     const inner = (
         <>
@@ -220,10 +217,12 @@ function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, s
             )}
             <div className="flex-1 p-4 overflow-hidden">
                 <div ref={gridRef} className="h-full grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${100 * displayZoom / 100}px, 1fr))`, gridTemplateRows: `repeat(auto-fill, minmax(${70 * displayZoom / 100}px, 1fr))` }}>
-                    {pageOrders.map((order, idx) => order ? (
-                        <OrderCard key={order.id} order={order} getOrderLabel={getOrderLabel} cardBgClass={cardBgClass} />
+                    {animatedOrders.map(({ key, order, exiting }) => order ? (
+                        <div key={key} className={exiting ? "order-card--exit" : "order-card"} aria-hidden={exiting}>
+                            <OrderCard order={order} getOrderLabel={getOrderLabel} cardBgClass={cardBgClass} />
+                        </div>
                     ) : (
-                        <div key={`blank-${idx}`} />
+                        <div key={key} />
                     ))}
                 </div>
             </div>
@@ -318,11 +317,11 @@ export default function Display() {
     const { t } = useTranslation();
     const router = useRouter();
     const [displayMode, setDisplayMode] = useState<DisplayMode>("ready");
-    const [numberDisplay, setNumberDisplay] = useState<NumberDisplay>("displayCode");
-    const [ticketNumberMax, setTicketNumberMax] = useState<number>(100);
-    const [stationsEnabled, setStationsEnabled] = useState(false);
+    const [showNumbers, setShowNumbers] = useState<boolean | null>(null);
     const [autoScrollPagesEnabled, setAutoScrollPagesEnabled] = useState(true);
     const [stations, setStations] = useState<Station[]>([]);
+    const [stationsLoaded, setStationsLoaded] = useState(false);
+    const [refreshingStations, setRefreshingStations] = useState(false);
     const [displayZoom, setDisplayZoom] = useState(100);
 
     const TITLE_MAP: Record<DisplayMode, string> = {
@@ -338,29 +337,7 @@ export default function Display() {
     const ordersMapRef = useRef<Map<string, ReadyOrder>>(new Map());
     useEffect(() => { ordersMapRef.current = ordersMap; }, [ordersMap]);
 
-    // Con le postazioni disattivate il backend non popola `orderStationStates`:
-    // filtrare su quell'array nasconderebbe tutti gli ordini.
-    const hasStationStates = useCallback(
-        (o: ReadyOrder) => !stationsEnabled || (o.orderStationStates ?? []).length > 0,
-        [stationsEnabled]
-    );
-
-    // --- Derived lists: normal mode (pre-sorted) ---
-    const readyOrders = useMemo(() =>
-        Array.from(ordersMap.values())
-            .filter(o => hasStationStates(o) && o.status === 'COMPLETED')
-            .sort((a, b) => a.ticketNumber - b.ticketNumber),
-        [ordersMap, hasStationStates]
-    );
-
-    const prepOrders = useMemo(() =>
-        Array.from(ordersMap.values())
-            .filter(o => hasStationStates(o) && (o.status === 'CONFIRMED' || o.status === 'PARTIAL'))
-            .sort((a, b) => a.ticketNumber - b.ticketNumber),
-        [ordersMap, hasStationStates]
-    );
-
-    // --- Derived maps: station mode ---
+    // --- Orders grouped by station ---
     const stationConfirmed = useMemo(() => {
         const map: Record<string, ReadyOrder[]> = {};
         for (const s of stations) map[s.id] = [];
@@ -383,18 +360,10 @@ export default function Display() {
         return map;
     }, [ordersMap, stations]);
 
-    // Single-mode pagination
-    const [currentPage, setCurrentPage] = useState(0);
-    const [displayedOrders, setDisplayedOrders] = useState<(ReadyOrder | null)[]>([]);
-    const latestOrdersRef = useRef<ReadyOrder[]>([]);
     const displayModeRef = useRef<DisplayMode>("ready");
 
     const [announcement, setAnnouncement] = useState("");
     const [eventName, setEventName] = useState("");
-
-    const stationsEnabledRef = useRef(false);
-    const autoScrollPagesEnabledRef = useRef(true);
-    useEffect(() => { autoScrollPagesEnabledRef.current = autoScrollPagesEnabled; }, [autoScrollPagesEnabled]);
 
     // Full-screen overlay
     const [fullscreenAlertEnabled, setFullscreenAlertEnabled] = useState(true);
@@ -405,20 +374,9 @@ export default function Display() {
     const [fsExiting, setFsExiting] = useState(false);
 
     const getOrderLabel = useCallback(
-        (order: ReadyOrder) => {
-            if (numberDisplay !== "ticketNumber") return order.displayCode;
-            if (!ticketNumberMax) return String(order.ticketNumber);
-            return String(order.ticketNumber % ticketNumberMax);
-        },
-        [numberDisplay, ticketNumberMax]
+        (order: ReadyOrder) => showNumbers ? String(order.ticketNumber) : order.displayCode,
+        [showNumbers]
     );
-
-    const activeOrders = displayMode === "preparing" ? prepOrders : readyOrders;
-
-    useEffect(() => { latestOrdersRef.current = activeOrders; }, [activeOrders]);
-
-    const totalPages = Math.max(1, Math.ceil(displayedOrders.length / CARDS_PER_PAGE));
-    const pageOrders = displayedOrders.slice(currentPage * CARDS_PER_PAGE, (currentPage + 1) * CARDS_PER_PAGE);
 
     // ------------------------------------------------------------------
     // Fetch initial orders
@@ -440,10 +398,7 @@ export default function Display() {
                 orderStationStates: o.orderStationStates,
             });
 
-            const filtered = stationsEnabledRef.current
-                ? orders.filter(o => (o.orderStationStates ?? []).length > 0)
-                : orders;
-            setOrdersMap(new Map(filtered.map(o => [o.id, toRO(o)])));
+            setOrdersMap(new Map(orders.filter(o => (o.orderStationStates ?? []).length > 0).map(o => [o.id, toRO(o)])));
         } catch (err) {
             if (handleApiError(err, router)) return;
             console.error("Failed to fetch orders:", err);
@@ -462,10 +417,6 @@ export default function Display() {
                     if (storedName) setEventName(storedName);
                     const storedMode = localStorage.getItem(DISPLAY_MODE_KEY) as DisplayMode | null;
                     if (storedMode && ["ready", "preparing", "hybrid"].includes(storedMode)) { setDisplayMode(storedMode); displayModeRef.current = storedMode; }
-                    const storedND = localStorage.getItem(NUMBER_DISPLAY_KEY) as NumberDisplay | null;
-                    if (storedND && ["displayCode", "ticketNumber"].includes(storedND)) setNumberDisplay(storedND);
-                    const storedMax = localStorage.getItem(TICKET_NUMBER_MAX_KEY);
-                    if (storedMax) { const n = parseInt(storedMax, 10); if (!isNaN(n) && n >= 1) setTicketNumberMax(n); }
                     fetchOrders();
                     return;
                 }
@@ -473,35 +424,17 @@ export default function Display() {
                 const mode = cfg.displayMode as DisplayMode;
                 if (mode && ["ready", "preparing", "hybrid"].includes(mode)) { setDisplayMode(mode); displayModeRef.current = mode; }
                 if (typeof cfg.announcement === "string") setAnnouncement(cfg.announcement);
-                if (cfg.numberDisplay && ["displayCode", "ticketNumber"].includes(cfg.numberDisplay)) setNumberDisplay(cfg.numberDisplay as NumberDisplay);
-                if (typeof cfg.ticketNumberMax === "number" && cfg.ticketNumberMax >= 0) setTicketNumberMax(cfg.ticketNumberMax);
+                if (typeof cfg.showNumbers === "boolean") setShowNumbers(cfg.showNumbers);
                 if (typeof cfg.fullscreenAlertEnabled === "boolean") { fullscreenAlertEnabledRef.current = cfg.fullscreenAlertEnabled; setFullscreenAlertEnabled(cfg.fullscreenAlertEnabled); }
-                if (typeof cfg.autoScrollPagesEnabled === "boolean") { autoScrollPagesEnabledRef.current = cfg.autoScrollPagesEnabled; setAutoScrollPagesEnabled(cfg.autoScrollPagesEnabled); }
+                if (typeof cfg.autoScrollPagesEnabled === "boolean") setAutoScrollPagesEnabled(cfg.autoScrollPagesEnabled);
                 if (typeof cfg.displayZoom === "number" && cfg.displayZoom >= 50 && cfg.displayZoom <= 200) { setDisplayZoom(cfg.displayZoom); localStorage.setItem(DISPLAY_ZOOM_KEY, String(cfg.displayZoom)); }
-                if (cfg.stationsEnabled) {
-                    stationsEnabledRef.current = true;
-                    setStationsEnabled(true);
-                    apiFetch<Station[]>("/api/stations")
-                        .then(data => {
-                            if (Array.isArray(data)) {
-                                setStations(data);
-                                fetchOrders();
-                            }
-                        })
-                        .catch(err => { if (!handleApiError(err, router)) console.error(err); });
-                } else {
-                    fetchOrders();
-                }
+                fetchOrders();
             })
             .catch(() => {
                 const storedName = localStorage.getItem(EVENT_NAME_KEY);
                 if (storedName) setEventName(storedName);
                 const storedMode = localStorage.getItem(DISPLAY_MODE_KEY) as DisplayMode | null;
                 if (storedMode && ["ready", "preparing", "hybrid"].includes(storedMode)) { setDisplayMode(storedMode); displayModeRef.current = storedMode; }
-                const storedND = localStorage.getItem(NUMBER_DISPLAY_KEY) as NumberDisplay | null;
-                if (storedND && ["displayCode", "ticketNumber"].includes(storedND)) setNumberDisplay(storedND);
-                const storedMax = localStorage.getItem(TICKET_NUMBER_MAX_KEY);
-                if (storedMax) { const n = parseInt(storedMax, 10); if (!isNaN(n) && n >= 1) setTicketNumberMax(n); }
                 const storedZoom = localStorage.getItem(DISPLAY_ZOOM_KEY);
                 if (storedZoom) { const z = parseInt(storedZoom, 10); if (!isNaN(z) && z >= 50 && z <= 200) setDisplayZoom(z); }
                 fetchOrders();
@@ -520,34 +453,33 @@ export default function Display() {
                 if (cfg.eventName !== undefined) setEventName(cfg.eventName);
                 const mode = cfg.displayMode as DisplayMode;
                 if (mode && ["ready", "preparing", "hybrid"].includes(mode)) { setDisplayMode(mode); displayModeRef.current = mode; }
-                if (cfg.numberDisplay && ["displayCode", "ticketNumber"].includes(cfg.numberDisplay)) setNumberDisplay(cfg.numberDisplay as NumberDisplay);
-                if (typeof cfg.ticketNumberMax === "number" && cfg.ticketNumberMax >= 0) setTicketNumberMax(cfg.ticketNumberMax);
                 if (typeof cfg.fullscreenAlertEnabled === "boolean") { fullscreenAlertEnabledRef.current = cfg.fullscreenAlertEnabled; setFullscreenAlertEnabled(cfg.fullscreenAlertEnabled); }
-                if (typeof cfg.autoScrollPagesEnabled === "boolean") { autoScrollPagesEnabledRef.current = cfg.autoScrollPagesEnabled; setAutoScrollPagesEnabled(cfg.autoScrollPagesEnabled); }
+                if (typeof cfg.autoScrollPagesEnabled === "boolean") setAutoScrollPagesEnabled(cfg.autoScrollPagesEnabled);
                 if (typeof cfg.displayZoom === "number" && cfg.displayZoom >= 50 && cfg.displayZoom <= 200) { setDisplayZoom(cfg.displayZoom); localStorage.setItem(DISPLAY_ZOOM_KEY, String(cfg.displayZoom)); }
-                if (typeof cfg.stationsEnabled === "boolean") {
-                    stationsEnabledRef.current = cfg.stationsEnabled;
-                    setStationsEnabled(cfg.stationsEnabled);
-                    if (cfg.stationsEnabled) {
-                        apiFetch<Station[]>("/api/stations")
-                            .then(stationList => {
-                                if (Array.isArray(stationList)) {
-                                    setStations(stationList);
-                                    fetchOrders();
-                                }
-                            })
-                            .catch(err => { if (!handleApiError(err, router)) console.error(err); });
-                    } else {
-                        setStations([]);
-                        fetchOrders();
-                    }
-                }
             },
             onError: err => console.error("SSE display-config:", err),
         });
         return () => close();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const fetchStations = useCallback(async () => {
+        setRefreshingStations(true);
+        try {
+            const data = await withMinimumDelay(apiFetch<Station[]>("/api/stations"), 200);
+            if (Array.isArray(data)) {
+                setStations(data);
+                setStationsLoaded(true);
+                if (data.length > 0) await fetchOrders();
+            }
+        } catch (err) {
+            if (!handleApiError(err, router)) console.error("Failed to fetch stations:", err);
+        } finally {
+            setRefreshingStations(false);
+        }
+    }, [fetchOrders, router]);
+
+    useEffect(() => { void fetchStations(); }, [fetchStations]);
 
     // ------------------------------------------------------------------
     // SSE — order updates
@@ -564,12 +496,10 @@ export default function Display() {
                 "confirmed-order": (data, _frame, type) => {
                     try {
                         const raw = data as ReadyOrder;
-                        // Con le postazioni attive un ordine senza stazioni non va mostrato
-                        if (stationsEnabledRef.current && (raw.ordersStations ?? []).length === 0) return;
+                        if (!(raw.ordersStations?.length || raw.orderStationStates?.length)) return;
                         // Il payload dell'evento non porta `status`: lo si deduce dal tipo evento
                         const status = raw.status ?? statusForOrderEvent(type) ?? 'CONFIRMED';
-                        // Postazioni attive: la UI legge gli station states, sintetizzati se assenti.
-                        // Postazioni disattive: resta vuoto e conta lo `status` a livello ordine.
+                        // Il payload SSE può contenere solo gli ID delle postazioni.
                         const orderStationStates = (raw.orderStationStates ?? []).length > 0
                             ? raw.orderStationStates!
                             : (raw.ordersStations ?? []).map(stId => ({ stationId: stId, status }));
@@ -583,25 +513,20 @@ export default function Display() {
                     try {
                         const raw = data as ReadyOrder;
                         const sid = String(raw.id);
-                        const mode = displayModeRef.current;
-
                         setOrdersMap(prev => {
                             const existing = prev.get(sid);
                             if (!existing) return prev;
 
                             let orderStationStates = existing.orderStationStates;
-                            // In station mode, propagate order-level status to station states.
-                            // Handles header undo ops that PATCH order-level (no stationId).
-                            if (stationsEnabledRef.current) {
-                                if (raw.status === 'COMPLETED') {
-                                    orderStationStates = (orderStationStates ?? []).map(s =>
-                                        s.status === 'PICKED_UP' ? { ...s, status: 'COMPLETED' } : s
-                                    );
-                                } else if (raw.status === 'CONFIRMED') {
-                                    orderStationStates = (orderStationStates ?? []).map(s =>
-                                        s.status === 'COMPLETED' ? { ...s, status: 'CONFIRMED' } : s
-                                    );
-                                }
+                            // The header undo PATCH targets the whole order.
+                            if (raw.status === 'COMPLETED') {
+                                orderStationStates = (orderStationStates ?? []).map(s =>
+                                    s.status === 'PICKED_UP' ? { ...s, status: 'COMPLETED' } : s
+                                );
+                            } else if (raw.status === 'CONFIRMED') {
+                                orderStationStates = (orderStationStates ?? []).map(s =>
+                                    s.status === 'COMPLETED' ? { ...s, status: 'CONFIRMED' } : s
+                                );
                             }
 
                             return new Map(prev).set(sid, {
@@ -612,25 +537,12 @@ export default function Display() {
                                 orderStationStates,
                             });
                         });
-
-                        // Alert: order reached COMPLETED in normal mode
-                        if (!stationsEnabledRef.current && raw.status === 'COMPLETED' &&
-                            (mode === 'ready' || mode === 'hybrid') && fullscreenAlertEnabledRef.current) {
-                            const alertOrder: ReadyOrder = {
-                                id: sid,
-                                status: raw.status,
-                                displayCode: raw.displayCode,
-                                ticketNumber: raw.ticketNumber,
-                            };
-                            setFsQueue(q => q.find(o => o.id === sid) ? q : [...q, alertOrder]);
-                        }
                     } catch (err) {
                         console.error("Error handling order-status-update event:", err);
                     }
                 },
 
                 "order-station-status-update": (data) => {
-                    if (!stationsEnabledRef.current) return;
                     try {
                         const { orderId, stationId, status } = data as { orderId: string; stationId: string; status: string };
                         const sid = String(orderId);
@@ -707,73 +619,28 @@ export default function Display() {
         return () => { clearTimeout(exitTimer); clearTimeout(clearTimer); };
     }, [currentFsOrder]);
 
-    // ------------------------------------------------------------------
-    // Single-mode pagination
-    // ------------------------------------------------------------------
-    useEffect(() => {
-        if (displayMode === "hybrid" || stationsEnabled) return;
-        const ordered = [...activeOrders].sort((a, b) => a.ticketNumber - b.ticketNumber);
-        setDisplayedOrders(ordered);
-        setCurrentPage(0);
-    }, [displayMode]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    useEffect(() => {
-        if (displayMode === "hybrid" || stationsEnabled) return;
-        const orderedActive = [...activeOrders].sort((a, b) => a.ticketNumber - b.ticketNumber);
-        setDisplayedOrders(prev => {
-            const prevItems = prev.filter((o): o is ReadyOrder => o !== null);
-            if (prevItems.length <= CARDS_PER_PAGE) return orderedActive;
-            const currentIds = new Set(orderedActive.map(o => o.id));
-            const prevIds = new Set(prevItems.map(o => o.id));
-            const newOrders = orderedActive.filter(o => !prevIds.has(o.id));
-            const base = prev.map(o => (o === null || currentIds.has(o.id)) ? o : null);
-            if (newOrders.length === 0 && base.every((o, i) => o === prev[i])) return prev;
-            return [...base, ...newOrders];
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeOrders, displayMode]);
-
-    useEffect(() => {
-        if (displayMode === "hybrid" || stationsEnabled) return;
-        if (!autoScrollPagesEnabled) { setCurrentPage(0); return; }
-        if (totalPages <= 1) { setCurrentPage(0); return; }
-        const timer = setTimeout(() => {
-            setCurrentPage(prev => {
-                const next = prev + 1;
-                if (next >= totalPages) { setDisplayedOrders([...latestOrdersRef.current]); return 0; }
-                return next;
-            });
-        }, PAGE_INTERVAL);
-        return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentPage, totalPages, displayMode, autoScrollPagesEnabled]);
-
-    // ------------------------------------------------------------------
-    // Derived: effective mode when stations active
-    // ------------------------------------------------------------------
+    const noStations = stationsLoaded && stations.length === 0;
     const hybridAllowed = stations.length <= MAX_STATIONS_FOR_HYBRID;
-    const effectiveHybrid = stationsEnabled && displayMode === "hybrid" && hybridAllowed;
-    const effectivePreparing = stationsEnabled && (displayMode === "preparing" || (displayMode === "hybrid" && !hybridAllowed));
-    const effectiveReady = stationsEnabled && displayMode === "ready";
+    const effectiveHybrid = stations.length > 0 && displayMode === "hybrid" && hybridAllowed;
+    const effectivePreparing = displayMode === "preparing" || (displayMode === "hybrid" && !hybridAllowed);
 
     // ------------------------------------------------------------------
-    // Render
+    // Render only after the server has provided SHOW_NUMBERS.
     // ------------------------------------------------------------------
+    if (showNumbers === null) return <div className="h-screen bg-gray-100" />;
+
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-gray-100 text-gray-900">
             {!effectiveHybrid && (
-                <Header
-                    pageKey={currentPage}
-                    showProgress={!stationsEnabled && displayMode !== "hybrid" && totalPages > 1}
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    title={TITLE_MAP[displayMode]}
-                    eventName={eventName}
-                />
+                <Header title={TITLE_MAP[displayMode]} eventName={eventName} />
             )}
 
-            {/* STATIONS — HYBRID (≤3 stations): one card per station split top=prep/bottom=ready */}
-            {effectiveHybrid ? (
+            {noStations ? (
+                <main className="flex flex-1 items-center justify-center p-4">
+                    <EmptyStations publicDisplay onRefresh={() => { void fetchStations(); }} refreshing={refreshingStations} />
+                </main>
+            /* STATIONS — HYBRID (≤3 stations): one card per station split top=prep/bottom=ready */
+            ) : effectiveHybrid ? (
                 <main className="flex-1 overflow-hidden p-4 flex gap-4">
                     {stations.map((station, idx) => {
                         const sortedTop = [...(stationConfirmed[station.id] ?? [])].sort((a, b) => a.ticketNumber - b.ticketNumber);
@@ -829,7 +696,7 @@ export default function Display() {
                 </main>
 
             /* STATIONS — READY */
-            ) : effectiveReady ? (
+            ) : (
                 <main className="flex-1 overflow-hidden p-4 flex gap-4">
                     {stations.map((station, idx) => {
                         const sorted = [...(stationCompleted[station.id] ?? [])].sort((a, b) => a.ticketNumber - b.ticketNumber);
@@ -851,52 +718,6 @@ export default function Display() {
                         );
                     })}
                 </main>
-
-            /* NORMAL — HYBRID */
-            ) : displayMode === "hybrid" ? (
-                <main className="flex-1 overflow-hidden p-4 grid grid-cols-4 gap-4">
-                    <div className="col-span-3 h-full">
-                        <DisplaySection
-                            orders={prepOrders}
-                            cols={HYBRID_PREP_COLS}
-                            rows={HYBRID_PREP_ROWS}
-                            title={t("display.preparing")}
-                            headerClass="bg-yellow-300"
-                            cardBgClass="bg-yellow-100"
-                            sectionId="prep"
-                            immediateRemoval
-                            getOrderLabel={getOrderLabel}
-                            autoScrollEnabled={autoScrollPagesEnabled}
-                            displayZoom={displayZoom}
-                        />
-                    </div>
-                    <div className="col-span-1 h-full">
-                        <DisplaySection
-                            orders={readyOrders}
-                            cols={HYBRID_READY_COLS}
-                            rows={HYBRID_READY_ROWS}
-                            title={t("display.ready")}
-                            headerClass="bg-green-400"
-                            cardBgClass="bg-green-100"
-                            sectionId="ready"
-                            getOrderLabel={getOrderLabel}
-                            autoScrollEnabled={true}
-                            displayZoom={displayZoom}
-                        />
-                    </div>
-                </main>
-
-            /* NORMAL — SINGLE MODE */
-            ) : (
-                <main className="flex-1 overflow-hidden p-4">
-                    <div className="h-full grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(clamp(${100 * displayZoom / 100}px, 14vw, ${220 * displayZoom / 100}px), 1fr))`, gridTemplateRows: `repeat(auto-fill, minmax(${80 * displayZoom / 100}px, 1fr))` }}>
-                        {pageOrders.map((order, idx) => order ? (
-                            <OrderCard key={order.id} order={order} getOrderLabel={getOrderLabel} />
-                        ) : (
-                            <div key={`blank-${idx}`} />
-                        ))}
-                    </div>
-                </main>
             )}
 
             <Footer announcement={announcement} />
@@ -912,9 +733,7 @@ export default function Display() {
                         style={{ minWidth: "min(88vw, 900px)", minHeight: "min(70vh, 600px)" }}
                     >
                         <p className="text-4xl font-bold text-gray-500 uppercase tracking-widest mb-6 select-none">
-                            {currentFsOrder._alertStationId
-                                ? <>{t("display.orderReady")} in <span className="text-black">{stations.find(s => s.id === currentFsOrder._alertStationId)?.name ?? currentFsOrder._alertStationId}</span></>
-                                : currentFsOrder.status === "COMPLETED" ? t("display.orderReadyCode") : t("display.preparingOrderCode")}
+                            {t("display.orderReady")} in <span className="text-black">{stations.find(s => s.id === currentFsOrder._alertStationId)?.name ?? currentFsOrder._alertStationId}</span>
                         </p>
                         <p className="font-black font-mono text-black select-none leading-none" style={{ fontSize: "clamp(8rem, 18vw, 20rem)" }}>
                             {getOrderLabel(currentFsOrder)}

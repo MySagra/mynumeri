@@ -66,28 +66,28 @@ export function GeneralSettingsCard() {
     const hasChanges = eventName !== savedEventName;
 
     return (
-        <Card>
-            <CardHeader>
+        <Card className="gap-4 rounded-2xl border-border/70 py-4 shadow-sm">
+            <CardHeader className="gap-1 px-4 sm:px-5">
                 <div className="flex items-center gap-2 select-none">
-                    <Settings className="h-5 w-5 text-amber-600" />
+                    <Settings className="h-5 w-5 text-amber-500" />
                     <CardTitle>{t("settings.general")}</CardTitle>
                 </div>
                 <CardDescription className="select-none">
                     {t("settings.generalDesc")}
                 </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="flex flex-col md:flex-row md:items-center gap-3">
-                    <div className="space-y-1.5 md:flex-1">
+            <CardContent className="space-y-4 px-4 sm:px-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-0.5 sm:flex-1">
                         <Label htmlFor="event-name">{t("settings.eventName")}</Label>
                         <div className="text-sm text-muted-foreground select-none">
                             {t("settings.eventNameDesc")}
                         </div>
                     </div>
                     {isLoading ? (
-                        <Skeleton className="h-9 w-full md:max-w-sm rounded-md" />
+                        <Skeleton className="h-9 w-full rounded-md sm:max-w-sm" />
                     ) : (
-                        <div className="flex flex-col w-full md:max-w-sm">
+                        <div className="flex w-full flex-col sm:max-w-sm">
                             <Input
                                 id="event-name"
                                 placeholder={t("settings.eventNamePlaceholder")}

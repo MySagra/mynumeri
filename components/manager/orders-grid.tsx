@@ -2,23 +2,23 @@ import { cn } from "@/lib/utils";
 import { Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useState, useEffect } from "react";
-import { NUMBER_DISPLAY_KEY, TICKET_NUMBER_MAX_KEY } from "@/components/settings/NumberDisplaySettingsCard";
-import type { DisplayConfig, NumberDisplay } from "@/lib/display-config-store";
+import { useState, useEffect, useMemo } from "react";
+import { useAnimatedOrders } from "@/hooks/use-animated-orders";
 
-// Ogni OrderCard leggeva la config con una fetch propria: con N card a schermo
-// (e a ogni rimontaggio della griglia) partiva una raffica di richieste.
-// Una promessa condivisa con TTL collassa tutto in una richiesta ogni 5s.
+// Share the server-provided SHOW_NUMBERS flag across cards to avoid duplicate requests.
 const CONFIG_TTL_MS = 5000;
-let configPromise: Promise<Partial<DisplayConfig> | null> | null = null;
+let configPromise: Promise<{ showNumbers: boolean } | null> | null = null;
 let configFetchedAt = 0;
 
-function fetchDisplayConfig(): Promise<Partial<DisplayConfig> | null> {
+function fetchDisplayConfig(): Promise<{ showNumbers: boolean } | null> {
     const now = Date.now();
     if (!configPromise || now - configFetchedAt > CONFIG_TTL_MS) {
         configFetchedAt = now;
         configPromise = fetch("/api/display-config")
-            .then(res => res.ok ? res.json() : null)
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to load display config");
+                return res.json();
+            })
             .catch(err => { configPromise = null; throw err; });
     }
     return configPromise;
@@ -36,7 +36,8 @@ interface OrdersGridProps {
 }
 
 export default function OrdersGrid({ className, orders, title, status, stationId, onPrev, onNext, children }: OrdersGridProps) {
-    const sortedOrders = [...orders].sort((a, b) => a.ticketNumber - b.ticketNumber);
+    const sortedOrders = useMemo(() => [...orders].sort((a, b) => a.ticketNumber - b.ticketNumber), [orders]);
+    const animatedOrders = useAnimatedOrders(sortedOrders);
 
     return (
         <div className={cn("select-none h-full w-full rounded-xl outline-2 outline-secondary bg-card shadow-lg overflow-hidden flex flex-col", className)}>
@@ -54,9 +55,9 @@ export default function OrdersGrid({ className, orders, title, status, stationId
                 }
                 <div className="flex gap-3 flex-wrap items-start place-content-start">
                     {
-                        sortedOrders.map((order) => (
-                            <div key={stationId ? `${order.id}-${stationId}` : order.id} className="w-40">
-                                <OrderCard order={order} status={status} onPrev={onPrev} onNext={onNext} />
+                        animatedOrders.map(({ key, order, exiting }) => order && (
+                            <div key={stationId ? `${key}-${stationId}` : key} className={cn("w-40", exiting ? "order-card--exit" : "order-card")} inert={exiting}>
+                                <OrderCard order={order} status={status} onPrev={exiting ? undefined : onPrev} onNext={exiting ? undefined : onNext} />
                             </div>
                         ))
                     }
@@ -74,37 +75,12 @@ interface OrderCardProps {
 }
 
 export function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
-    const [numberDisplay, setNumberDisplay] = useState<NumberDisplay>(() => {
-        const stored = localStorage.getItem(NUMBER_DISPLAY_KEY) as NumberDisplay | null;
-        return (stored && ["displayCode", "ticketNumber"].includes(stored)) ? stored : "displayCode";
-    });
-    const [ticketNumberMax, setTicketNumberMax] = useState<number>(0);
+    const [showNumbers, setShowNumbers] = useState<boolean | null>(null);
 
     useEffect(() => {
         fetchDisplayConfig()
-            .then(cfg => {
-                if (!cfg) {
-                    const nd = localStorage.getItem(NUMBER_DISPLAY_KEY) as NumberDisplay | null;
-                    if (nd && ["displayCode", "ticketNumber"].includes(nd)) setNumberDisplay(nd);
-                    const mx = localStorage.getItem(TICKET_NUMBER_MAX_KEY);
-                    if (mx !== null) { const n = parseInt(mx, 10); if (!isNaN(n) && n >= 0) setTicketNumberMax(n); }
-                    return;
-                }
-                if (cfg.numberDisplay && ["displayCode", "ticketNumber"].includes(cfg.numberDisplay)) {
-                    setNumberDisplay(cfg.numberDisplay as NumberDisplay);
-                    localStorage.setItem(NUMBER_DISPLAY_KEY, cfg.numberDisplay);
-                }
-                if (typeof cfg.ticketNumberMax === "number" && cfg.ticketNumberMax >= 0) {
-                    setTicketNumberMax(cfg.ticketNumberMax);
-                    localStorage.setItem(TICKET_NUMBER_MAX_KEY, String(cfg.ticketNumberMax));
-                }
-            })
-            .catch(() => {
-                const nd = localStorage.getItem(NUMBER_DISPLAY_KEY) as NumberDisplay | null;
-                if (nd && ["displayCode", "ticketNumber"].includes(nd)) setNumberDisplay(nd);
-                const mx = localStorage.getItem(TICKET_NUMBER_MAX_KEY);
-                if (mx !== null) { const n = parseInt(mx, 10); if (!isNaN(n) && n >= 0) setTicketNumberMax(n); }
-            });
+            .then(cfg => { if (cfg && typeof cfg.showNumbers === "boolean") setShowNumbers(cfg.showNumbers); })
+            .catch(err => console.error("Failed to load number display mode:", err));
     }, []);
 
     function addNext() {
@@ -119,12 +95,10 @@ export function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
         }
     }
 
-    const orderTitle = (() => {
-        if (numberDisplay == "displayCode") return order.displayCode;
-        // 0 = no max, show raw ticketNumber
-        if (!ticketNumberMax) return String(order.ticketNumber);
-        return String(order.ticketNumber % ticketNumberMax);
-    })();
+    // Do not render a code while the server's display mode is still unknown.
+    if (showNumbers === null) return <div className="h-16" aria-hidden="true" />;
+
+    const orderTitle = showNumbers ? String(order.ticketNumber) : order.displayCode;
 
     if (status === 'CONFIRMED') {
         return (

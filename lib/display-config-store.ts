@@ -5,15 +5,11 @@ import fs from "fs";
 import path from "path";
 
 export type DisplayMode = "ready" | "preparing" | "hybrid";
-export type NumberDisplay = "displayCode" | "ticketNumber";
 
 export interface DisplayConfig {
     announcement: string;
     eventName: string;
     displayMode: DisplayMode;
-    numberDisplay: NumberDisplay;
-    ticketNumberMax: number;
-    stationsEnabled: boolean;
     fullscreenAlertEnabled: boolean;
     autoScrollPagesEnabled: boolean;
     displayZoom: number;
@@ -28,9 +24,6 @@ const DEFAULT_CONFIG: DisplayConfig = {
     announcement: "",
     eventName: "",
     displayMode: "ready",
-    numberDisplay: "displayCode",
-    ticketNumberMax: 100,
-    stationsEnabled: false,
     fullscreenAlertEnabled: true,
     autoScrollPagesEnabled: true,
     displayZoom: 100,
@@ -46,8 +39,15 @@ function loadFromFile(): void {
     try {
         if (fs.existsSync(CONFIG_PATH)) {
             const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
-            const parsed = JSON.parse(raw) as Partial<DisplayConfig>;
-            cache = { ...DEFAULT_CONFIG, ...parsed };
+            const parsed = JSON.parse(raw) as Partial<DisplayConfig> & {
+                stationsEnabled?: boolean;
+                numberDisplay?: string;
+                ticketNumberMax?: number;
+            };
+            // Discard retired preferences from older config files.
+            const { stationsEnabled: _stations, numberDisplay: _display, ticketNumberMax: _max, ...current } = parsed;
+            void _stations; void _display; void _max;
+            cache = { ...DEFAULT_CONFIG, ...current };
         }
     } catch {
         // Missing or corrupt file — keep defaults
@@ -86,8 +86,7 @@ export function updateConfig(patch: Partial<DisplayConfig>): DisplayConfig {
     }
 
     if (patch.displayMode !== undefined || patch.eventName !== undefined ||
-        patch.numberDisplay !== undefined || patch.ticketNumberMax !== undefined ||
-        patch.stationsEnabled !== undefined || patch.fullscreenAlertEnabled !== undefined ||
+        patch.fullscreenAlertEnabled !== undefined ||
         patch.autoScrollPagesEnabled !== undefined || patch.displayZoom !== undefined) {
         configSubscribers.forEach((fn) => {
             try { fn({ ...cache }); } catch { /* subscriber gone */ }

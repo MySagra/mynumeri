@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import { OrderCard } from "@/components/manager/orders-grid";
 import { PickedUpOrdersSheet } from "@/components/manager/picked-up-orders-sheet";
 import { useTranslation } from "react-i18next";
+import { useMemo } from "react";
+import { useAnimatedOrders } from "@/hooks/use-animated-orders";
 
 interface StationCardProps {
     className?: string;
@@ -31,6 +33,10 @@ export function StationCard({
     onPickupPrev,
 }: StationCardProps) {
     const { t } = useTranslation();
+    const sortedConfirmed = useMemo(() => [...confirmedOrders].sort((a, b) => a.ticketNumber - b.ticketNumber), [confirmedOrders]);
+    const sortedCompleted = useMemo(() => [...completedOrders].sort((a, b) => a.ticketNumber - b.ticketNumber), [completedOrders]);
+    const animatedConfirmed = useAnimatedOrders(sortedConfirmed);
+    const animatedCompleted = useAnimatedOrders(sortedCompleted);
 
     return (
         <div className={cn("select-none h-full w-full rounded-xl outline-2 outline-secondary bg-card shadow-lg overflow-hidden flex flex-col", className)}>
@@ -48,9 +54,9 @@ export function StationCard({
                 </div>
                 <div className="flex-1 overflow-y-auto px-4 pb-4">
                     <div className="flex gap-3 flex-wrap items-start place-content-start">
-                        {[...confirmedOrders].sort((a, b) => a.ticketNumber - b.ticketNumber).map(order => (
-                            <div key={`${order.id}-${stationId}`} className="min-w-28">
-                                <OrderCard order={order} status="CONFIRMED" onNext={onConfirmedNext} />
+                        {animatedConfirmed.map(({ key, order, exiting }) => order && (
+                            <div key={key} className={cn("min-w-28", exiting ? "order-card--exit" : "order-card")} inert={exiting}>
+                                <OrderCard order={order} status="CONFIRMED" onNext={exiting ? undefined : onConfirmedNext} />
                             </div>
                         ))}
                     </div>
@@ -70,9 +76,9 @@ export function StationCard({
                 </div>
                 <div className="flex-1 overflow-y-auto px-4 pb-4">
                     <div className="flex gap-3 flex-wrap items-start place-content-start">
-                        {[...completedOrders].sort((a, b) => a.ticketNumber - b.ticketNumber).map(order => (
-                            <div key={`${order.id}-${stationId}`} className="min-w-20">
-                                <OrderCard order={order} status="COMPLETED" onPrev={onCompletedPrev} onNext={onCompletedNext} />
+                        {animatedCompleted.map(({ key, order, exiting }) => order && (
+                            <div key={key} className={cn("min-w-20", exiting ? "order-card--exit" : "order-card")} inert={exiting}>
+                                <OrderCard order={order} status="COMPLETED" onPrev={exiting ? undefined : onCompletedPrev} onNext={exiting ? undefined : onCompletedNext} />
                             </div>
                         ))}
                     </div>

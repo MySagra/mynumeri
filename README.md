@@ -28,16 +28,18 @@ Part of the **MySagra** ecosystem, MyNumeri integrates seamlessly with backend s
 ## ✨ Features
 
 ### 🎯 Core Functionality
-- **Customer Display Screen** — public screen showing order numbers with automatic pagination
-- **Staff Manager Panel** — advance orders through *In Preparation* → *Ready* → *Picked Up* stages
+- **Customer Display Screen** — public screen showing order numbers by pickup station with automatic pagination
+- **Staff Manager Panel** — advance orders at each pickup station through *In Preparation* → *Ready* → *Picked Up* stages
 - **Real-time Updates** — instant order state changes via Server-Sent Events (SSE)
 - **Announcement Ticker** — scrolling marquee banner at the bottom of the display screen
 - **Workday-aware Filtering** — orders are automatically scoped to the current day's shift (08:00–07:59)
 
 ### 🖥️ Display Modes
-- **`ready`** — shows only orders ready for pickup
-- **`preparing`** — shows only orders currently being prepared
-- **`hybrid`** — split-screen with ¾ for preparation and ¼ for ready orders
+- **`ready`** — shows orders ready for pickup at each station
+- **`preparing`** — shows orders being prepared at each station
+- **`hybrid`** — shows both stages per station (falls back to preparation with more than three stations)
+
+Pickup stations are always enabled; orders without a pickup station are not displayed.
 
 ### 🎨 User Experience
 - **Modern UI** — built with shadcn/ui components and Radix UI primitives
@@ -77,13 +79,14 @@ Part of the **MySagra** ecosystem, MyNumeri integrates seamlessly with backend s
    ```env
    # Backend API URL
    API_URL=http://mysagra-backend:4300
+   SHOW_NUMBERS=false
 
    # NextAuth Configuration
    NEXTAUTH_URL=http://localhost:3033
    NEXTAUTH_SECRET=your_secure_random_secret_here
    ```
 
-   > **Note**: `API_URL` is used server-side only and is never exposed to the client.
+   > **Note**: `API_URL` is used server-side only and is never exposed to the client. `SHOW_NUMBERS=true` displays the raw ticket number instead of the display code on both screens; omitted or `false` uses display codes. No modulo/number limit is applied.
 
 4. **Run the development server**
    ```bash
@@ -204,6 +207,7 @@ mynumeri/
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `API_URL` | Backend API URL (server-side only) | `http://mysagra-backend:4300` |
+| `SHOW_NUMBERS` | Display raw ticket numbers instead of display codes (`true`/`false`) | `false` |
 | `NEXTAUTH_SECRET` | Secret key for NextAuth sessions | Random string (`openssl rand -base64 32`) |
 | `NEXTAUTH_URL` | Application URL for auth callbacks | `http://localhost:3033` |
 
