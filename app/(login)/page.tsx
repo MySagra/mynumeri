@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useMounted } from '@/hooks/use-mounted';
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { LoginForm } from "@/components/login/login-form";
@@ -19,12 +20,8 @@ const ERROR_MESSAGE_KEYS: Record<string, string> = {
 export default function LoginPage() {
     const { theme, setTheme } = useTheme();
     const { t } = useTranslation();
-    const [mounted, setMounted] = useState(false);
-
     // Prevent hydration mismatch by only rendering theme toggle after mount
-    useEffect(() => {
-        setMounted(true);
-    }, []);
+    const mounted = useMounted();
 
     // Mostra un toast se reindirizzati al login con un codice errore (?error=)
     useEffect(() => {

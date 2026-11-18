@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMounted } from '@/hooks/use-mounted';
 import { useTheme } from '@teispace/next-themes';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -9,9 +9,7 @@ import { useTranslation } from "react-i18next";
 export function AppearanceSettingsCard() {
     const { theme, setTheme } = useTheme();
     const { t } = useTranslation();
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => setMounted(true), []);
+    const mounted = useMounted();
 
     // Before mount, render neutral variants to match SSR output
     const lightVariant = mounted && theme === 'light' ? 'default' : 'outline';

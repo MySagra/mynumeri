@@ -13,6 +13,8 @@ import { resolveOrderEventType, statusForOrderEvent } from "@/lib/order-events";
 import { withMinimumDelay } from "@/lib/minimum-delay";
 import { applySagraSettings, loadSagraSettings, SETTINGS_UPDATE_EVENT } from "@/lib/sagra-settings";
 import { getShiftStart } from "@/utils/utils";
+import { applyDisplayUpdate, loadDisplays, useSelectedDisplay, DISPLAY_UPDATE_EVENT } from "@/lib/displays";
+import { DisplayPicker } from "@/components/display-picker";
 
 async function getWorkdayBounds() {
     // Il turno si calcola nella timezone della sagra (impostazioni centralizzate).
@@ -40,7 +42,15 @@ export default function Manager() {
     const [ordersMap, setOrdersMap] = useState<Map<string, Order>>(new Map());
 
     // Station config
-    const [stations, setStations] = useState<Station[]>([]);
+    // Monitor scelto su questo dispositivo: il manager gestisce solo le sue postazioni
+    const { display, ready: displaysReady } = useSelectedDisplay("manager");
+    const [pickingDisplay, setPickingDisplay] = useState(false);
+    const [allStations, setAllStations] = useState<Station[]>([]);
+    const stations = useMemo(() => {
+        if (!display) return [];
+        const byId = new Map(allStations.map(s => [s.id, s]));
+        return display.stationIds.map(id => byId.get(id)).filter((s): s is Station => !!s);
+    }, [allStations, display]);
     const [stationsLoaded, setStationsLoaded] = useState(false);
     const [refreshingStations, setRefreshingStations] = useState(false);
     // --- Orders grouped by station ---
@@ -101,39 +111,65 @@ export default function Manager() {
         return all;
     };
 
-    const fetchOrders = useCallback(async () => {
+    // Fetch puri (nessun setState): l'applicazione del risultato è separata, così gli
+    // effect possono applicarlo in un callback asincrono.
+    const loadOrders = useCallback(async (): Promise<Order[] | null> => {
         try {
             const { dateFrom, dateTo } = await getWorkdayBounds();
             const dateParams = `&dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`;
-            const orders = await fetchAllPages(`${dateParams}&include=ordersStationsStates`);
-            setOrdersMap(new Map(orders.filter(o => (o.orderStationStates ?? []).length > 0).map(o => [o.id, o])));
+            return await fetchAllPages(`${dateParams}&include=ordersStationsStates`);
         } catch (error) {
-            if (handleApiError(error, router)) return;
-            console.error("Failed to fetch orders:", error);
+            if (!handleApiError(error, router)) console.error("Failed to fetch orders:", error);
+            return null;
         }
     }, [router]);
 
-    const fetchStations = useCallback(async () => {
-        setRefreshingStations(true);
+    const applyOrders = (orders: Order[]) => {
+        setOrdersMap(new Map(orders.filter(o => (o.orderStationStates ?? []).length > 0).map(o => [o.id, o])));
+    };
+
+    const fetchOrders = useCallback(async () => {
+        const orders = await loadOrders();
+        if (orders) applyOrders(orders);
+    }, [loadOrders]);
+
+    const loadStations = useCallback(async (): Promise<Station[] | null> => {
         try {
             const data = await withMinimumDelay(apiFetch<Station[]>("/api/stations"), 200);
-            if (Array.isArray(data)) {
-                setStations(data);
-                setStationsLoaded(true);
-                if (data.length > 0) await fetchOrders();
-            }
+            return Array.isArray(data) ? data : null;
         } catch (err) {
             if (!handleApiError(err, router)) console.error("Failed to fetch stations:", err);
+            return null;
+        }
+    }, [router]);
+
+    const applyStations = useCallback(async (data: Station[]) => {
+        setAllStations(data);
+        setStationsLoaded(true);
+        if (data.length > 0) await fetchOrders();
+    }, [fetchOrders]);
+
+    // Ricarica manuale (pulsante): mostra lo spinner, a differenza del caricamento iniziale
+    const refreshStations = async () => {
+        setRefreshingStations(true);
+        try {
+            const data = await loadStations();
+            if (data) await applyStations(data);
         } finally {
             setRefreshingStations(false);
         }
-    }, [fetchOrders, router]);
+    };
 
-    useEffect(() => { void fetchStations(); }, [fetchStations]);
+    useEffect(() => {
+        let active = true;
+        void loadStations().then(data => { if (active && data) void applyStations(data); });
+        return () => { active = false; };
+    }, [loadStations, applyStations]);
 
     // SSE setup
     useEffect(() => {
-        fetchOrders();
+        let active = true;
+        void loadOrders().then(orders => { if (active && orders) applyOrders(orders); });
 
         const handleConfirmedOrder = (data: unknown, _frame?: unknown, type = 'confirmed-order') => {
             try {
@@ -159,6 +195,7 @@ export default function Manager() {
             onOpen: ({ reconnect }) => {
                 if (!reconnect) return;
                 void loadSagraSettings(true);
+                void loadDisplays(true);
                 fetchOrders();
             },
             onError: () => { console.error("SSE connection error"); },
@@ -166,6 +203,7 @@ export default function Manager() {
             onMessage: handleConfirmedOrder,
             on: {
                 [SETTINGS_UPDATE_EVENT]: (data) => { applySagraSettings(data); },
+                [DISPLAY_UPDATE_EVENT]: (data) => { applyDisplayUpdate(data); },
 
                 'confirmed-order': handleConfirmedOrder,
 
@@ -232,8 +270,8 @@ export default function Manager() {
             },
         });
 
-        return () => { close(); };
-    }, [fetchOrders, t]);
+        return () => { active = false; close(); };
+    }, [fetchOrders, loadOrders, t]);
 
     const updateOrderStatus = async (orderId: string, newStatus: Status, stationId?: string) => {
         try {
@@ -304,11 +342,23 @@ export default function Manager() {
 
     return (
         <div className="h-screen w-full flex flex-col overflow-hidden">
-            <Header pickedUpOrders={pickedUpOrders} onPickupPrev={handlePickupToCompleteStation} />
+            <Header
+                pickedUpOrders={pickedUpOrders}
+                onPickupPrev={handlePickupToCompleteStation}
+                display={display}
+                onChangeDisplay={() => setPickingDisplay(true)}
+            />
             <main className="flex-1 w-full overflow-hidden">
-                {stationsLoaded && stations.length === 0 ? (
+                {!displaysReady ? null : !display || pickingDisplay ? (
+                    <div className="flex h-full items-start justify-center overflow-auto px-4 pb-4 pt-24">
+                        <DisplayPicker
+                            scope="manager"
+                            onClose={display ? () => setPickingDisplay(false) : undefined}
+                        />
+                    </div>
+                ) : stationsLoaded && stations.length === 0 ? (
                     <div className="flex h-full items-center justify-center px-4 pt-16">
-                        <EmptyStations onRefresh={() => { void fetchStations(); }} refreshing={refreshingStations} />
+                        <EmptyStations onRefresh={() => { void refreshStations(); }} refreshing={refreshingStations} />
                     </div>
                 ) : (
                     <div className="h-full w-full flex gap-3 p-3 pt-20 md:pt-24 max-w-[1920px] mx-auto overflow-x-auto">

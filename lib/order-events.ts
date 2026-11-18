@@ -1,4 +1,5 @@
 import { isSettingsPayload, SETTINGS_UPDATE_EVENT } from "@/lib/sagra-settings";
+import { isDisplayPayload, DISPLAY_UPDATE_EVENT } from "@/lib/displays";
 
 /**
  * Deduce il tipo di evento ordine dalla forma del payload.
@@ -12,6 +13,9 @@ export function resolveOrderEventType(data: unknown): string | undefined {
 
     if (isSettingsPayload(payload)) {
         return SETTINGS_UPDATE_EVENT;
+    }
+    if (isDisplayPayload(payload)) {
+        return DISPLAY_UPDATE_EVENT;
     }
     if (payload.orderId !== undefined && payload.stationId !== undefined) {
         return "order-station-status-update";

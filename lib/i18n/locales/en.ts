@@ -1,6 +1,8 @@
 export const en = {
   translation: {
     header: {
+      fullscreen: "Full screen",
+      exitFullscreen: "Exit full screen",
       clockTooltip: "Current time ({{timezone}})"
     },
     common: {
@@ -57,6 +59,21 @@ export const en = {
       orderReadyCode: "Order ready code:",
       preparingOrderCode: "We are preparing order:"
     },
+    displays: {
+      chooseTitle: "Choose the monitor",
+      chooseDescManager: "Select the monitor to manage on this device: only its stations will be shown.",
+      chooseDescDisplay: "Select which monitor to show on this screen.",
+      change: "Change monitor",
+      refresh: "Reload monitors",
+      cancel: "Cancel",
+      none: "No monitors configured",
+      noneDesc: "Create monitors from the MySagra admin panel.",
+      loadError: "Unable to load monitors. Try again.",
+      noStations: "No stations",
+      viewReady: "Ready",
+      viewPreparing: "Preparing",
+      viewHybrid: "Hybrid"
+    },
     settings: {
       appearance: "Appearance",
       appearanceDesc: "Customize the application appeareance",
@@ -64,20 +81,8 @@ export const en = {
       themeDesc: "Choose between light and dark theme",
       light: "Light",
       dark: "Dark",
-      displayModeReady: "Ready only",
-      displayModeReadyDesc: "Shows only orders ready for pickup",
-      displayModePrep: "Preparing only",
-      displayModePrepDesc: "Shows only orders currently in preparation",
-      displayModeHybrid: "Hybrid view",
-      displayModeHybridDesc: "Preparing and ready orders for each station (up to 3 stations)",
-      display: "Display",
-      displayDesc: "Edit the display page",
-      displayOptions: "Display options",
-      operativeMode: "Operative mode",
-      operativeModeDesc: "Select what to show on the public display page",
       saving: "Saving...",
       save: "Save",
-      displayModeSaved: "Display mode saved",
       saveError: "Error during saving",
       general: "General",
       generalDesc: "Configure the general settings of the mynumeri interface",
@@ -88,10 +93,6 @@ export const en = {
       managedByBackend: "These settings are managed centrally by MySagra and update automatically.",
       settings: "Settings",
       backToManager: "Back to Manager",
-      fullscreenAlertEnabled: "Full-screen alert",
-      fullscreenAlertEnabledDesc: "Show a full-screen overlay when an order is ready",
-      autoScrollPagesEnabled: "Auto-scroll pages",
-      autoScrollPagesEnabledDesc: "Automatically scroll through order pages every 10 seconds",
       displayZoom: "Display zoom",
       displayZoomDesc: "Adjust the size of numbers on the public display",
       zoomSaved: "Display zoom saved",

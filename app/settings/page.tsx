@@ -3,7 +3,7 @@
 import { SettingsHeader } from "@/components/settings/header";
 import { AppearanceSettingsCard } from "@/components/settings/AppearanceSettingsCard";
 import { GeneralSettingsCard } from "@/components/settings/GeneralSettingsCard";
-import { DisplayModeSettingsCard } from "@/components/settings/DisplayModeSettingsCard";
+import { DisplayZoomSettingsCard } from "@/components/settings/DisplayZoomSettingsCard";
 
 export default function SettingsPage() {
     return (
@@ -12,7 +12,7 @@ export default function SettingsPage() {
             <main className="min-h-screen w-full bg-background">
                 <div className="mx-auto max-w-4xl space-y-5 px-4 pb-10 pt-24 sm:px-6">
                     <GeneralSettingsCard />
-                    <DisplayModeSettingsCard />
+                    <DisplayZoomSettingsCard />
                     <AppearanceSettingsCard />
                 </div>
             </main>

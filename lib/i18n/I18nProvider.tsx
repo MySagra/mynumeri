@@ -1,22 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { I18nextProvider } from "react-i18next";
-import i18n from "./i18n";
+import i18n, { LANGUAGE_STORAGE_KEY } from "./i18n";
+import { useMounted } from "@/hooks/use-mounted";
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false);
+  // La lingua salvata è già applicata all'inizializzazione di i18n (lib/i18n/i18n.ts)
+  const mounted = useMounted();
 
   useEffect(() => {
-    // Determine language from localStorage or default to IT
-    const savedLang = localStorage.getItem("app_lang") || "it";
-    if (i18n.language !== savedLang) {
-      i18n.changeLanguage(savedLang);
-    }
-    setMounted(true);
-
     const handleLanguageChange = (lng: string) => {
-      localStorage.setItem("app_lang", lng);
+      try { localStorage.setItem(LANGUAGE_STORAGE_KEY, lng); } catch { /* localStorage non disponibile */ }
     };
 
     i18n.on("languageChanged", handleLanguageChange);
@@ -25,9 +20,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Show nothing or a fallback while mounting to prevent hydration mismatch
+  // Nothing until mounted, so the client language never mismatches the server render
   if (!mounted) {
-    return null; // Or a loading skeleton if needed, but given the simplicity, null prevents flicker of wrong language.
+    return null;
   }
 
   return <I18nextProvider i18n={i18n}>{children}</I18nextProvider>;

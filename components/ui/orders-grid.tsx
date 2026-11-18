@@ -2,15 +2,7 @@ import { cn } from "@/lib/utils";
 import { Undo2, CheckCircle } from "lucide-react";
 import { Button } from "./button";
 import { ButtonGroup } from "./button-group";
-import {
-    Card,
-    CardAction,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 
 interface OrdersGridProps {
     className?: string;

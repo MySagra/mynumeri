@@ -4,8 +4,7 @@ import { Header } from "@/components/display/header";
 import { EmptyStations } from "@/components/empty-stations";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { getWorkdayBounds, sortByDate } from "@/utils/utils";
-import { type DisplayMode, DISPLAY_MODE_KEY } from "@/components/settings/DisplayModeSettingsCard";
+import { getWorkdayBounds } from "@/utils/utils";
 import { DISPLAY_ZOOM_KEY } from "@/components/settings/DisplayZoomSettingsCard";
 import type { DisplayConfig } from "@/lib/display-config-store";
 import { useTranslation } from "react-i18next";
@@ -14,6 +13,9 @@ import { subscribeSSE } from "@/lib/sse";
 import { resolveOrderEventType, statusForOrderEvent } from "@/lib/order-events";
 import { withMinimumDelay } from "@/lib/minimum-delay";
 import { useAnimatedOrders } from "@/hooks/use-animated-orders";
+import { applyDisplayUpdate, displayModeOf, loadDisplays, useSelectedDisplay, DISPLAY_UPDATE_EVENT, type DisplayMode } from "@/lib/displays";
+import { DisplayPicker } from "@/components/display-picker";
+import { Monitor } from "lucide-react";
 import { applySagraSettings, loadSagraSettings, useSagraSettings, SETTINGS_UPDATE_EVENT } from "@/lib/sagra-settings";
 
 const PAGE_INTERVAL = 10000;
@@ -159,7 +161,11 @@ function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, s
     const realOrderCount = displayedOrders.filter((o): o is ReadyOrder => o !== null).length;
     const totalPages = Math.max(1, Math.ceil(realOrderCount / cardsPerPage));
 
-    useEffect(() => {
+    // Riallinea gli ordini mostrati quando cambiano gli input (aggiornamento in render,
+    // non in un effect: evita un secondo render a cascata).
+    const [syncedInputs, setSyncedInputs] = useState({ orders, cardsPerPage, immediateRemoval });
+    if (syncedInputs.orders !== orders || syncedInputs.cardsPerPage !== cardsPerPage || syncedInputs.immediateRemoval !== immediateRemoval) {
+        setSyncedInputs({ orders, cardsPerPage, immediateRemoval });
         setDisplayedOrders(prev => {
             const prevItems = prev.filter((o): o is ReadyOrder => o !== null);
             if (prevItems.length <= cardsPerPage) return orders;
@@ -176,25 +182,27 @@ function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, s
             if (newOrders.length === 0 && base.every((o, i) => o === prev[i])) return prev;
             return [...base, ...newOrders];
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [orders, cardsPerPage, immediateRemoval]);
+    }
+
+    // Senza scorrimento (o con una sola pagina) si resta sempre sulla prima pagina
+    const paging = autoScrollEnabled && totalPages > 1;
+    const page = paging ? Math.min(currentPage, totalPages - 1) : 0;
 
     useEffect(() => {
-        if (!autoScrollEnabled) { setCurrentPage(0); return; }
-        if (totalPages <= 1) { setCurrentPage(0); return; }
+        if (!paging) return;
         const timer = setTimeout(() => {
-            setCurrentPage(prev => {
-                const next = prev + 1;
-                if (next >= totalPages) { setDisplayedOrders([...latestRef.current]); return 0; }
-                return next;
-            });
+            if (page + 1 >= totalPages) {
+                setDisplayedOrders([...latestRef.current]);
+                setCurrentPage(0);
+            } else {
+                setCurrentPage(page + 1);
+            }
         }, PAGE_INTERVAL);
         return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentPage, totalPages, autoScrollEnabled]);
+    }, [page, totalPages, paging]);
 
-    const pageOrders = displayedOrders.slice(currentPage * cardsPerPage, (currentPage + 1) * cardsPerPage);
-    const animatedOrders = useAnimatedOrders(pageOrders, String(currentPage));
+    const pageOrders = displayedOrders.slice(page * cardsPerPage, (page + 1) * cardsPerPage);
+    const animatedOrders = useAnimatedOrders(pageOrders, String(page));
 
     const inner = (
         <>
@@ -202,7 +210,7 @@ function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, s
                 <h3 className={`font-bold text-black select-none tracking-tight ${bare ? "text-lg" : "text-3xl font-black"}`}>{title}</h3>
                 {autoScrollEnabled && totalPages > 1 && (
                     <div className="flex items-center gap-1 bg-black/10 rounded-lg px-3 py-1">
-                        <span className="text-black font-black text-base select-none tabular-nums leading-none">{currentPage + 1}</span>
+                        <span className="text-black font-black text-base select-none tabular-nums leading-none">{page + 1}</span>
                         <span className="text-black/50 font-bold text-sm select-none leading-none">/</span>
                         <span className="text-black font-black text-base select-none tabular-nums leading-none">{totalPages}</span>
                     </div>
@@ -211,7 +219,7 @@ function DisplaySection({ orders, cols, rows, title, headerClass, cardBgClass, s
             {autoScrollEnabled && (
                 <div className="h-1.5 w-full bg-black/10 shrink-0">
                     {totalPages > 1 && (
-                        <div key={`${sectionId}-${currentPage}`} className="h-full bg-black/70 rounded-r-full origin-left" style={{ animation: `progress-bar-fill ${PAGE_INTERVAL}ms linear forwards` }} />
+                        <div key={`${sectionId}-${page}`} className="h-full bg-black/70 rounded-r-full origin-left" style={{ animation: `progress-bar-fill ${PAGE_INTERVAL}ms linear forwards` }} />
                     )}
                 </div>
             )}
@@ -316,13 +324,25 @@ function SplitDisplaySection({
 export default function Display() {
     const { t } = useTranslation();
     const router = useRouter();
-    const [displayMode, setDisplayMode] = useState<DisplayMode>("ready");
+    // Monitor scelto su questo dispositivo: vista, alert, scroll e postazioni.
+    const { display, ready: displaysReady } = useSelectedDisplay("display");
+    const [pickingDisplay, setPickingDisplay] = useState(false);
+    const displayMode: DisplayMode = displayModeOf(display);
+    const fullscreenAlertEnabled = display?.showAlert ?? true;
+    const autoScrollPagesEnabled = display?.autoScroll ?? true;
     // Impostazioni centralizzate: nome sagra, timezone, showNumbers.
     const sagraSettings = useSagraSettings();
     const showNumbers = sagraSettings?.showNumbers ?? null;
     const eventName = sagraSettings?.sagraName ?? "";
-    const [autoScrollPagesEnabled, setAutoScrollPagesEnabled] = useState(true);
-    const [stations, setStations] = useState<Station[]>([]);
+    const [allStations, setAllStations] = useState<Station[]>([]);
+    // Solo le postazioni del monitor scelto, nell'ordine configurato
+    const stations = useMemo(() => {
+        if (!display) return [];
+        const byId = new Map(allStations.map(s => [s.id, s]));
+        return display.stationIds.map(id => byId.get(id)).filter((s): s is Station => !!s);
+    }, [allStations, display]);
+    const stationIdsRef = useRef<Set<string>>(new Set());
+    useEffect(() => { stationIdsRef.current = new Set(stations.map(s => s.id)); }, [stations]);
     const [stationsLoaded, setStationsLoaded] = useState(false);
     const [refreshingStations, setRefreshingStations] = useState(false);
     const [displayZoom, setDisplayZoom] = useState(100);
@@ -364,15 +384,16 @@ export default function Display() {
     }, [ordersMap, stations]);
 
     const displayModeRef = useRef<DisplayMode>("ready");
+    useEffect(() => { displayModeRef.current = displayMode; }, [displayMode]);
 
     const [announcement, setAnnouncement] = useState("");
 
     // Full-screen overlay
-    const [fullscreenAlertEnabled, setFullscreenAlertEnabled] = useState(true);
     const fullscreenAlertEnabledRef = useRef(true);
     useEffect(() => { fullscreenAlertEnabledRef.current = fullscreenAlertEnabled; }, [fullscreenAlertEnabled]);
+    // Coda degli alert: quello mostrato è sempre il primo della coda
     const [fsQueue, setFsQueue] = useState<ReadyOrder[]>([]);
-    const [currentFsOrder, setCurrentFsOrder] = useState<ReadyOrder | null>(null);
+    const currentFsOrder = fsQueue[0] ?? null;
     const [fsExiting, setFsExiting] = useState(false);
 
     const getOrderLabel = useCallback(
@@ -416,22 +437,14 @@ export default function Display() {
             .then(res => res.ok ? res.json() : null)
             .then(cfg => {
                 if (!cfg) {
-                    const storedMode = localStorage.getItem(DISPLAY_MODE_KEY) as DisplayMode | null;
-                    if (storedMode && ["ready", "preparing", "hybrid"].includes(storedMode)) { setDisplayMode(storedMode); displayModeRef.current = storedMode; }
                     fetchOrders();
                     return;
                 }
-                const mode = cfg.displayMode as DisplayMode;
-                if (mode && ["ready", "preparing", "hybrid"].includes(mode)) { setDisplayMode(mode); displayModeRef.current = mode; }
                 if (typeof cfg.announcement === "string") setAnnouncement(cfg.announcement);
-                if (typeof cfg.fullscreenAlertEnabled === "boolean") { fullscreenAlertEnabledRef.current = cfg.fullscreenAlertEnabled; setFullscreenAlertEnabled(cfg.fullscreenAlertEnabled); }
-                if (typeof cfg.autoScrollPagesEnabled === "boolean") setAutoScrollPagesEnabled(cfg.autoScrollPagesEnabled);
                 if (typeof cfg.displayZoom === "number" && cfg.displayZoom >= 50 && cfg.displayZoom <= 200) { setDisplayZoom(cfg.displayZoom); localStorage.setItem(DISPLAY_ZOOM_KEY, String(cfg.displayZoom)); }
                 fetchOrders();
             })
             .catch(() => {
-                const storedMode = localStorage.getItem(DISPLAY_MODE_KEY) as DisplayMode | null;
-                if (storedMode && ["ready", "preparing", "hybrid"].includes(storedMode)) { setDisplayMode(storedMode); displayModeRef.current = storedMode; }
                 const storedZoom = localStorage.getItem(DISPLAY_ZOOM_KEY);
                 if (storedZoom) { const z = parseInt(storedZoom, 10); if (!isNaN(z) && z >= 50 && z <= 200) setDisplayZoom(z); }
                 fetchOrders();
@@ -447,35 +460,46 @@ export default function Display() {
             onMessage: (payload) => {
                 if (!payload || typeof payload !== "object") return;
                 const cfg = payload as Partial<DisplayConfig>;
-                const mode = cfg.displayMode as DisplayMode;
-                if (mode && ["ready", "preparing", "hybrid"].includes(mode)) { setDisplayMode(mode); displayModeRef.current = mode; }
-                if (typeof cfg.fullscreenAlertEnabled === "boolean") { fullscreenAlertEnabledRef.current = cfg.fullscreenAlertEnabled; setFullscreenAlertEnabled(cfg.fullscreenAlertEnabled); }
-                if (typeof cfg.autoScrollPagesEnabled === "boolean") setAutoScrollPagesEnabled(cfg.autoScrollPagesEnabled);
                 if (typeof cfg.displayZoom === "number" && cfg.displayZoom >= 50 && cfg.displayZoom <= 200) { setDisplayZoom(cfg.displayZoom); localStorage.setItem(DISPLAY_ZOOM_KEY, String(cfg.displayZoom)); }
             },
             onError: err => console.error("SSE display-config:", err),
         });
         return () => close();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const fetchStations = useCallback(async () => {
-        setRefreshingStations(true);
+    // Fetch puro (nessun setState): l'applicazione del risultato è separata
+    const loadStations = useCallback(async (): Promise<Station[] | null> => {
         try {
             const data = await withMinimumDelay(apiFetch<Station[]>("/api/stations"), 200);
-            if (Array.isArray(data)) {
-                setStations(data);
-                setStationsLoaded(true);
-                if (data.length > 0) await fetchOrders();
-            }
+            return Array.isArray(data) ? data : null;
         } catch (err) {
             if (!handleApiError(err, router)) console.error("Failed to fetch stations:", err);
-        } finally {
-            setRefreshingStations(false);
+            return null;
         }
-    }, [fetchOrders, router]);
+    }, [router]);
 
-    useEffect(() => { void fetchStations(); }, [fetchStations]);
+    const applyStations = useCallback(async (data: Station[]) => {
+        setAllStations(data);
+        setStationsLoaded(true);
+        if (data.length > 0) await fetchOrders();
+    }, [fetchOrders]);
+
+    const fetchStations = useCallback(async () => {
+        const data = await loadStations();
+        if (data) await applyStations(data);
+    }, [loadStations, applyStations]);
+
+    // Ricarica manuale (pulsante): mostra lo spinner, a differenza del caricamento iniziale
+    const refreshStations = async () => {
+        setRefreshingStations(true);
+        try { await fetchStations(); } finally { setRefreshingStations(false); }
+    };
+
+    useEffect(() => {
+        let active = true;
+        void loadStations().then(data => { if (active && data) void applyStations(data); });
+        return () => { active = false; };
+    }, [loadStations, applyStations]);
 
     // ------------------------------------------------------------------
     // SSE — order updates
@@ -489,11 +513,13 @@ export default function Display() {
             onOpen: ({ reconnect }) => {
                 if (!reconnect) return;
                 void loadSagraSettings(true);
+                void loadDisplays(true);
                 fetchOrders();
             },
             onError: err => console.error("SSE display:", err),
             on: {
                 [SETTINGS_UPDATE_EVENT]: (data) => { applySagraSettings(data); },
+                [DISPLAY_UPDATE_EVENT]: (data) => { applyDisplayUpdate(data); },
 
                 "confirmed-order": (data, _frame, type) => {
                     try {
@@ -562,7 +588,8 @@ export default function Display() {
                         });
 
                         // Alert: station completed — read from ref snapshot (outside setOrdersMap)
-                        if (status === 'COMPLETED' && (mode === 'ready' || mode === 'hybrid') && fullscreenAlertEnabledRef.current) {
+                        if (status === 'COMPLETED' && (mode === 'ready' || mode === 'hybrid') && fullscreenAlertEnabledRef.current
+                            && stationIdsRef.current.has(stationId)) {
                             const order = ordersMapRef.current.get(sid);
                             if (order) setFsQueue(q => q.find(o => o.id === sid) ? q : [...q, { ...order, _alertStationId: stationId }]);
                         }
@@ -589,14 +616,12 @@ export default function Display() {
     // SSE — announcement
     // ------------------------------------------------------------------
     useEffect(() => {
-        const stored = localStorage.getItem("display-announcement");
-        if (stored) setAnnouncement(stored);
+        // Il valore iniziale arriva da /api/display-config; qui solo gli aggiornamenti live
         const close = subscribeSSE("/api/announcement/events", {
             onMessage: (data) => {
                 const { announcement: text } = (data ?? {}) as { announcement?: string };
                 if (typeof text !== "string") return;
                 setAnnouncement(text);
-                localStorage.setItem("display-announcement", text);
             },
             onError: err => console.error("SSE announcement:", err),
         });
@@ -607,21 +632,16 @@ export default function Display() {
     // Full-screen overlay
     // ------------------------------------------------------------------
     useEffect(() => {
-        if (currentFsOrder || fsQueue.length === 0) return;
-        const [next, ...rest] = fsQueue;
-        setFsQueue(rest);
-        setCurrentFsOrder(next);
-        setFsExiting(false);
-    }, [currentFsOrder, fsQueue]);
-
-    useEffect(() => {
         if (!currentFsOrder) return;
         const exitTimer = setTimeout(() => setFsExiting(true), 3500);
-        const clearTimer = setTimeout(() => setCurrentFsOrder(null), 4000);
+        const clearTimer = setTimeout(() => {
+            setFsQueue(q => q.slice(1));
+            setFsExiting(false);
+        }, 4000);
         return () => { clearTimeout(exitTimer); clearTimeout(clearTimer); };
     }, [currentFsOrder]);
 
-    const noStations = stationsLoaded && stations.length === 0;
+    const noStations = stationsLoaded && (allStations.length === 0 || stations.length === 0);
     const hybridAllowed = stations.length <= MAX_STATIONS_FOR_HYBRID;
     const effectiveHybrid = stations.length > 0 && displayMode === "hybrid" && hybridAllowed;
     const effectivePreparing = displayMode === "preparing" || (displayMode === "hybrid" && !hybridAllowed);
@@ -629,17 +649,30 @@ export default function Display() {
     // ------------------------------------------------------------------
     // Render only after the backend settings (showNumbers) are loaded.
     // ------------------------------------------------------------------
-    if (showNumbers === null) return <div className="h-screen bg-gray-100" />;
+    if (showNumbers === null || !displaysReady) return <div className="h-screen bg-gray-100" />;
+
+    // Il monitor si sceglie a ogni apertura/aggiornamento della pagina (scelta non salvata);
+    // il selettore torna anche se il monitor viene eliminato o se si chiede di cambiarlo.
+    if (!display || pickingDisplay) {
+        return (
+            <div className="flex h-screen items-center justify-center overflow-auto bg-gray-100 p-4 text-gray-900">
+                <DisplayPicker
+                    scope="display"
+                    publicDisplay
+                    onClose={display ? () => setPickingDisplay(false) : undefined}
+                />
+            </div>
+        );
+    }
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-gray-100 text-gray-900">
-            {!effectiveHybrid && (
-                <Header title={TITLE_MAP[displayMode]} eventName={eventName} />
-            )}
+            {/* In vista ibrida le sezioni hanno già i propri titoli: nell'header solo il nome sagra */}
+            <Header title={effectiveHybrid ? undefined : TITLE_MAP[displayMode]} eventName={eventName} />
 
             {noStations ? (
                 <main className="flex flex-1 items-center justify-center p-4">
-                    <EmptyStations publicDisplay onRefresh={() => { void fetchStations(); }} refreshing={refreshingStations} />
+                    <EmptyStations publicDisplay onRefresh={() => { void refreshStations(); }} refreshing={refreshingStations} />
                 </main>
             /* STATIONS — HYBRID (≤3 stations): one card per station split top=prep/bottom=ready */
             ) : effectiveHybrid ? (
@@ -723,6 +756,18 @@ export default function Display() {
             )}
 
             <Footer announcement={announcement} />
+
+            {/* Cambio monitor: discreto, visibile al passaggio del mouse */}
+            <button
+                type="button"
+                onClick={() => setPickingDisplay(true)}
+                title={t("displays.change")}
+                aria-label={t("displays.change")}
+                className="fixed bottom-14 right-3 z-40 flex items-center gap-2 rounded-full bg-black/70 px-3 py-2 text-sm text-white opacity-0 transition-opacity hover:opacity-100 focus-visible:opacity-100"
+            >
+                <Monitor className="size-4" aria-hidden />
+                {display.name}
+            </button>
 
             {/* Full-screen overlay */}
             {currentFsOrder && (

@@ -1,14 +1,14 @@
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Field, FieldDescription, FieldGroup, FieldLabel, } from "@/components/ui/field"
+import { Card, CardContent } from "@/components/ui/card"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { FormField, FormItem, FormControl } from "@/components/ui/form"
 import { Eye, EyeOff } from "lucide-react"
 import { useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm, FormProvider } from "react-hook-form"
+import { useForm, FormProvider, type FieldErrors } from "react-hook-form"
 import { toast } from "sonner";
 import { login as loginAction } from "@/actions/auth";
 import { USER_STORAGE_KEY } from "@/hooks/use-auth";
@@ -44,7 +44,7 @@ export function LoginForm() {
                 // Attendi che il cookie di sessione sia committato prima del reload.
                 await new Promise(resolve => setTimeout(resolve, 100));
                 // Full reload so il middleware veda il cookie appena impostato.
-                window.location.href = "/manager";
+                window.location.assign("/manager");
             } else {
                 toast.error(result.error || t("login.invalidCredentials"));
                 form.reset();
@@ -60,10 +60,10 @@ export function LoginForm() {
 
 
     // Handle validation errors from react-hook-form (zod)
-    function onError(errors: any) {
+    function onError(errors: FieldErrors<z.input<typeof formSchema>>) {
         // If both username and password are missing, show a combined message
-        const usernameError = (errors.username as any)?.message;
-        const passwordError = (errors.password as any)?.message;
+        const usernameError = errors.username?.message;
+        const passwordError = errors.password?.message;
 
         if (usernameError && passwordError) {
             toast.error(t("login.bothRequired"));
@@ -71,7 +71,7 @@ export function LoginForm() {
         }
 
         const first = Object.values(errors)[0];
-        const message = (first as any)?.message || t("login.validationError");
+        const message = (first as { message?: string } | undefined)?.message || t("login.validationError");
         toast.error(message);
     }
 

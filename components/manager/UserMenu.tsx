@@ -14,10 +14,10 @@ import {
     DropdownMenuSubContent,
     DropdownMenuCheckboxItem
 } from "@/components/ui/dropdown-menu"
-import { ChevronDownIcon, LogOutIcon, Settings, Sun, Moon, FileText, Languages } from "lucide-react"
+import { ChevronDownIcon, LogOutIcon, Settings, Sun, Moon, FileText, Languages, Monitor } from "lucide-react"
 import { useTheme } from "@teispace/next-themes"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useMounted } from "@/hooks/use-mounted"
 import { useTranslation } from "react-i18next"
 
 interface UserMenuProps {
@@ -27,6 +27,9 @@ interface UserMenuProps {
     }
     onLogout: () => void
     onOpenAvvisi?: () => void
+    onChangeDisplay?: () => void
+    /** Nome del monitor scelto, mostrato nella voce "Cambia monitor". */
+    displayName?: string
 }
 
 function UserAvatar({ initials, size = 8 }: { initials: string; size?: number }) {
@@ -39,14 +42,12 @@ function UserAvatar({ initials, size = 8 }: { initials: string; size?: number })
     )
 }
 
-export function UserMenu({ user, onLogout, onOpenAvvisi }: UserMenuProps) {
+export function UserMenu({ user, onLogout, onOpenAvvisi, onChangeDisplay, displayName }: UserMenuProps) {
     const initials = user.username.slice(0, 2).toUpperCase()
     const router = useRouter()
     const { theme, setTheme } = useTheme()
-    const [mounted, setMounted] = useState(false)
+    const mounted = useMounted()
     const { t, i18n } = useTranslation()
-
-    useEffect(() => { setMounted(true) }, [])
 
     return (
         <DropdownMenu>
@@ -66,7 +67,9 @@ export function UserMenu({ user, onLogout, onOpenAvvisi }: UserMenuProps) {
                         </div>
                     </div>
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator className="md:hidden" />
+                {/* Le voci rapide spariscono quando l'header ha spazio per mostrarle;
+                    il cambio monitor resta nel menu fino a lg */}
+                <DropdownMenuSeparator className={onChangeDisplay ? "lg:hidden" : "md:hidden"} />
                 <DropdownMenuItem
                     className="md:hidden cursor-pointer"
                     onClick={() => router.push("/settings")}
@@ -92,7 +95,19 @@ export function UserMenu({ user, onLogout, onOpenAvvisi }: UserMenuProps) {
                         {t("userMenu.notices")}
                     </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator className="md:hidden" />
+                {onChangeDisplay && (
+                    <DropdownMenuItem
+                        className="lg:hidden cursor-pointer"
+                        onClick={onChangeDisplay}
+                    >
+                        <Monitor className="h-4 w-4 bg-transparent outline-none border-none text-foreground" />
+                        <span className="grid leading-tight">
+                            <span>{t("displays.change")}</span>
+                            {displayName && <span className="truncate text-xs text-muted-foreground">{displayName}</span>}
+                        </span>
+                    </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator className={onChangeDisplay ? "lg:hidden" : "md:hidden"} />
                 <DropdownMenuSub>
                     <DropdownMenuSubTrigger className="cursor-pointer">
                         <Languages className="h-4 w-4 bg-transparent outline-none border-none text-foreground" />

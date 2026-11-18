@@ -1,6 +1,8 @@
 export const it = {
   translation: {
     header: {
+      fullscreen: "Schermo intero",
+      exitFullscreen: "Esci da schermo intero",
       clockTooltip: "Ora attuale ({{timezone}})"
     },
     common: {
@@ -57,6 +59,21 @@ export const it = {
       orderReadyCode: "Ordine pronto codice:",
       preparingOrderCode: "Stiamo preparando l'ordine:"
     },
+    displays: {
+      chooseTitle: "Scegli il monitor",
+      chooseDescManager: "Seleziona il monitor da gestire su questo dispositivo: verranno mostrate solo le sue postazioni.",
+      chooseDescDisplay: "Seleziona quale monitor mostrare su questo schermo.",
+      change: "Cambia monitor",
+      refresh: "Ricarica monitor",
+      cancel: "Annulla",
+      none: "Nessun monitor configurato",
+      noneDesc: "Crea i monitor dal pannello amministratore di MySagra.",
+      loadError: "Impossibile caricare i monitor. Riprova.",
+      noStations: "Nessuna postazione",
+      viewReady: "Pronti",
+      viewPreparing: "In preparazione",
+      viewHybrid: "Ibrida"
+    },
     settings: {
       appearance: "Aspetto",
       appearanceDesc: "Personalizza l'aspetto dell'applicazione",
@@ -64,20 +81,8 @@ export const it = {
       themeDesc: "Scegli tra tema chiaro e scuro",
       light: "Chiaro",
       dark: "Scuro",
-      displayModeReady: "Solo pronti",
-      displayModeReadyDesc: "Mostra solo gli ordini pronti per il ritiro",
-      displayModePrep: "Solo in preparazione",
-      displayModePrepDesc: "Mostra solo gli ordini attualmente in preparazione",
-      displayModeHybrid: "Vista ibrida",
-      displayModeHybridDesc: "Preparazione e ritiro per ogni postazione (fino a 3 postazioni)",
-      display: "Display",
-      displayDesc: "Modifica la pagina del display",
-      displayOptions: "Opzioni display",
-      operativeMode: "Modalità operativa",
-      operativeModeDesc: "Seleziona cosa mostrare nella pagina display pubblica",
       saving: "Salvataggio...",
       save: "Salva",
-      displayModeSaved: "Modalità display salvata",
       saveError: "Errore durante il salvataggio",
       general: "Generali",
       generalDesc: "Configura le impostazioni generali dell'interfaccia di mynumeri",
@@ -88,10 +93,6 @@ export const it = {
       managedByBackend: "Queste impostazioni sono gestite centralmente da MySagra e si aggiornano automaticamente.",
       settings: "Impostazioni",
       backToManager: "Torna al Manager",
-      fullscreenAlertEnabled: "Alert a tutto schermo",
-      fullscreenAlertEnabledDesc: "Mostra un overlay a tutto schermo quando un ordine è pronto",
-      autoScrollPagesEnabled: "Scorrimento automatico pagine",
-      autoScrollPagesEnabledDesc: "Scorre automaticamente le pagine di ordini ogni 10 secondi",
       displayZoom: "Zoom del display",
       displayZoomDesc: "Regola la dimensione dei numeri sul display pubblico",
       zoomSaved: "Zoom del display salvato",
