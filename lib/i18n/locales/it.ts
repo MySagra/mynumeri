@@ -6,28 +6,26 @@ export const it = {
       clockTooltip: "Ora attuale ({{timezone}})"
     },
     common: {
-      poweredBy: "Powered by",
       noPickupStations: "Nessuna postazione di ritiro configurata",
       configurePickupStations: "Vai al pannello amministratore e imposta le postazioni di ritiro per iniziare a gestire gli ordini.",
       refreshStations: "Ricarica postazioni",
       refreshingStations: "Aggiornamento..."
     },
-    login: {
-      welcome: "Benvenuto!",
-      subtitle: "Esegui il login al tuo account MyNumeri",
-      username: "Username",
-      usernamePlaceholder: "Username o Email",
-      password: "Password",
-      passwordPlaceholder: "La tua password",
-      loginBtn: "Accedi",
-      loggingIn: "Accesso...",
+    loginForm: {
       usernameRequired: "Username obbligatorio",
       passwordRequired: "Password obbligatoria",
-      bothRequired: "Username e Password sono obbligatori",
       invalidCredentials: "Credenziali non valide",
-      loginSuccess: "Login effettuato con successo!",
       loginError: "Errore durante il login",
+      bothRequired: "Username e Password sono obbligatori",
       validationError: "Errore di validazione",
+      welcome: "Benvenuto!",
+      subtitle: "Esegui il login al tuo account MyNumeri",
+      usernameLabel: "Username",
+      usernamePlaceholder: "Username o Email",
+      passwordLabel: "Password",
+      passwordPlaceholder: "La tua password",
+      loggingIn: "Accesso...",
+      loginButton: "Accedi",
       sessionExpired: "Sessione scaduta, effettua di nuovo il login",
       accessDenied: "Accesso negato: permessi insufficienti"
     },

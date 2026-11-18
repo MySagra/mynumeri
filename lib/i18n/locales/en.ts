@@ -6,28 +6,26 @@ export const en = {
       clockTooltip: "Current time ({{timezone}})"
     },
     common: {
-      poweredBy: "Powered by",
       noPickupStations: "No pickup stations configured",
       configurePickupStations: "Go to the admin panel and set up pickup stations to start managing orders.",
       refreshStations: "Refresh stations",
       refreshingStations: "Refreshing..."
     },
-    login: {
-      welcome: "Welcome!",
-      subtitle: "Login to your MyNumeri account",
-      username: "Username",
-      usernamePlaceholder: "Username or Email",
-      password: "Password",
-      passwordPlaceholder: "Your password",
-      loginBtn: "Sign In",
-      loggingIn: "Signing in...",
+    loginForm: {
       usernameRequired: "Username is required",
       passwordRequired: "Password is required",
-      bothRequired: "Username and Password are required",
       invalidCredentials: "Invalid credentials",
-      loginSuccess: "Login successful!",
       loginError: "Error during login",
+      bothRequired: "Username and Password are required",
       validationError: "Validation error",
+      welcome: "Welcome!",
+      subtitle: "Log in to your MyNumeri account",
+      usernameLabel: "Username",
+      usernamePlaceholder: "Username or Email",
+      passwordLabel: "Password",
+      passwordPlaceholder: "Your password",
+      loggingIn: "Logging in...",
+      loginButton: "Login",
       sessionExpired: "Session expired, please log in again",
       accessDenied: "Access denied: insufficient permissions"
     },
@@ -117,7 +115,7 @@ export const en = {
       notices: "Display Notices",
       logout: "Logout",
       language: "Language",
-      italian: "Italian",
+      italian: "Italiano",
       english: "English"
     }
   }
