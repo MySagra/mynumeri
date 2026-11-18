@@ -1,5 +1,8 @@
 export const it = {
   translation: {
+    header: {
+      clockTooltip: "Ora attuale ({{timezone}})"
+    },
     common: {
       poweredBy: "Powered by",
       noPickupStations: "Nessuna postazione di ritiro configurata",
@@ -78,10 +81,11 @@ export const it = {
       saveError: "Errore durante il salvataggio",
       general: "Generali",
       generalDesc: "Configura le impostazioni generali dell'interfaccia di mynumeri",
-      eventName: "Nome della sagra / festa",
+      eventName: "Nome della sagra",
       eventNameDesc: "Viene mostrato nell'header del display accanto al titolo",
-      eventNamePlaceholder: "es. Sagra 2026",
-      eventNameSaved: "Nome evento salvato",
+      timezone: "Fuso orario",
+      timezoneDesc: "Usato per calcolare la giornata di lavoro degli ordini",
+      managedByBackend: "Queste impostazioni sono gestite centralmente da MySagra e si aggiornano automaticamente.",
       settings: "Impostazioni",
       backToManager: "Torna al Manager",
       fullscreenAlertEnabled: "Alert a tutto schermo",

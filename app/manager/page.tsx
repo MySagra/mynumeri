@@ -11,14 +11,14 @@ import { apiFetch, handleApiError } from "@/lib/api";
 import { subscribeSSE } from "@/lib/sse";
 import { resolveOrderEventType, statusForOrderEvent } from "@/lib/order-events";
 import { withMinimumDelay } from "@/lib/minimum-delay";
+import { applySagraSettings, loadSagraSettings, SETTINGS_UPDATE_EVENT } from "@/lib/sagra-settings";
+import { getShiftStart } from "@/utils/utils";
 
-function getWorkdayBounds() {
-    const now = new Date();
-    const currentHour = now.getHours();
-    const start = new Date(now);
-    if (currentHour < 7) start.setDate(start.getDate() - 1);
-    start.setHours(7, 0, 0, 0);
-    return { dateFrom: start.toISOString(), dateTo: now.toISOString() };
+async function getWorkdayBounds() {
+    // Il turno si calcola nella timezone della sagra (impostazioni centralizzate).
+    const settings = await loadSagraSettings();
+    const start = getShiftStart(7, settings?.timezone);
+    return { dateFrom: start.toISOString(), dateTo: new Date().toISOString() };
 }
 
 const toOrder = (o: Order): Order => ({
@@ -103,7 +103,7 @@ export default function Manager() {
 
     const fetchOrders = useCallback(async () => {
         try {
-            const { dateFrom, dateTo } = getWorkdayBounds();
+            const { dateFrom, dateTo } = await getWorkdayBounds();
             const dateParams = `&dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`;
             const orders = await fetchAllPages(`${dateParams}&include=ordersStationsStates`);
             setOrdersMap(new Map(orders.filter(o => (o.orderStationStates ?? []).length > 0).map(o => [o.id, o])));
@@ -156,11 +156,17 @@ export default function Manager() {
             // in ultima istanza, viene dedotto dalla forma del JSON.
             resolveType: resolveOrderEventType,
             // Refetch full state on every reconnect to resync after any missed events
-            onOpen: ({ reconnect }) => { if (reconnect) fetchOrders(); },
+            onOpen: ({ reconnect }) => {
+                if (!reconnect) return;
+                void loadSagraSettings(true);
+                fetchOrders();
+            },
             onError: () => { console.error("SSE connection error"); },
             // Evento senza tipo riconoscibile: trattato come confirmed-order (comportamento storico)
             onMessage: handleConfirmedOrder,
             on: {
+                [SETTINGS_UPDATE_EVENT]: (data) => { applySagraSettings(data); },
+
                 'confirmed-order': handleConfirmedOrder,
 
                 'order-status-update': (data) => {

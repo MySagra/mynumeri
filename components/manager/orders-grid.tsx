@@ -2,27 +2,9 @@ import { cn } from "@/lib/utils";
 import { Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useAnimatedOrders } from "@/hooks/use-animated-orders";
-
-// Share the server-provided SHOW_NUMBERS flag across cards to avoid duplicate requests.
-const CONFIG_TTL_MS = 5000;
-let configPromise: Promise<{ showNumbers: boolean } | null> | null = null;
-let configFetchedAt = 0;
-
-function fetchDisplayConfig(): Promise<{ showNumbers: boolean } | null> {
-    const now = Date.now();
-    if (!configPromise || now - configFetchedAt > CONFIG_TTL_MS) {
-        configFetchedAt = now;
-        configPromise = fetch("/api/display-config")
-            .then(res => {
-                if (!res.ok) throw new Error("Failed to load display config");
-                return res.json();
-            })
-            .catch(err => { configPromise = null; throw err; });
-    }
-    return configPromise;
-}
+import { useSagraSettings } from "@/lib/sagra-settings";
 
 interface OrdersGridProps {
     className?: string;
@@ -75,13 +57,8 @@ interface OrderCardProps {
 }
 
 export function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
-    const [showNumbers, setShowNumbers] = useState<boolean | null>(null);
-
-    useEffect(() => {
-        fetchDisplayConfig()
-            .then(cfg => { if (cfg && typeof cfg.showNumbers === "boolean") setShowNumbers(cfg.showNumbers); })
-            .catch(err => console.error("Failed to load number display mode:", err));
-    }, []);
+    // `tickets.showNumbers` dalle impostazioni centralizzate (null finché non caricate).
+    const showNumbers = useSagraSettings()?.showNumbers ?? null;
 
     function addNext() {
         if (onNext) {
@@ -95,7 +72,7 @@ export function OrderCard({ order, status, onPrev, onNext }: OrderCardProps) {
         }
     }
 
-    // Do not render a code while the server's display mode is still unknown.
+    // Do not render a code while the backend settings are still unknown.
     if (showNumbers === null) return <div className="h-16" aria-hidden="true" />;
 
     const orderTitle = showNumbers ? String(order.ticketNumber) : order.displayCode;

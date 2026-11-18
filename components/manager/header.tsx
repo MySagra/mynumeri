@@ -15,6 +15,7 @@ import { UserMenu } from "@/components/manager/UserMenu";
 import { PickedUpOrdersSheet } from "@/components/manager/picked-up-orders-sheet";
 import { useTranslation } from "react-i18next";
 import { subscribeSSE } from "@/lib/sse";
+import { HeaderClock } from "@/components/header-clock";
 
 interface HeaderProps {
     pickedUpOrders?: Order[];
@@ -110,6 +111,8 @@ export function Header({ pickedUpOrders, onPickupPrev }: HeaderProps = {}) {
                     className="mx-auto h-10 w-auto select-none"
                 />
                 <h1 className="text-2xl font-bold select-none hidden md:block">MyNumeri</h1>
+                <div className="mx-2 h-8 w-px bg-border hidden md:block" aria-hidden />
+                <HeaderClock />
             </div>
             <div className="absolute top-4 right-4 flex items-center gap-2">
                 <ButtonGroup className="hidden md:flex">

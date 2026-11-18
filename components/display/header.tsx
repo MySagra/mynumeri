@@ -1,5 +1,6 @@
 import { Logo } from "../icons/logo";
 import { useTranslation } from "react-i18next";
+import { HeaderClock } from "@/components/header-clock";
 
 interface HeaderProps {
     title?: string;
@@ -30,7 +31,7 @@ export function Header({ title, eventName }: HeaderProps) {
                         )}
                     </h1>
                 </div>
-
+                <HeaderClock className="text-3xl font-black text-black" />
             </div>
 
             <div className="h-2.5 w-full bg-black/10" />

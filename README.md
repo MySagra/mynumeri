@@ -79,14 +79,13 @@ Pickup stations are always enabled; orders without a pickup station are not disp
    ```env
    # Backend API URL
    API_URL=http://mysagra-backend:4300
-   SHOW_NUMBERS=false
 
    # NextAuth Configuration
    NEXTAUTH_URL=http://localhost:3033
    NEXTAUTH_SECRET=your_secure_random_secret_here
    ```
 
-   > **Note**: `API_URL` is used server-side only and is never exposed to the client. `SHOW_NUMBERS=true` displays the raw ticket number instead of the display code on both screens; omitted or `false` uses display codes. No modulo/number limit is applied.
+   > **Note**: `API_URL` is used server-side only and is never exposed to the client. Sagra name, time zone and ticket number display (`tickets.showNumbers`) are read from the backend's centralized settings (`GET /v1/settings`) and updated live through the `settings-update` SSE event.
 
 4. **Run the development server**
    ```bash
@@ -207,7 +206,6 @@ mynumeri/
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `API_URL` | Backend API URL (server-side only) | `http://mysagra-backend:4300` |
-| `SHOW_NUMBERS` | Display raw ticket numbers instead of display codes (`true`/`false`) | `false` |
 | `NEXTAUTH_SECRET` | Secret key for NextAuth sessions | Random string (`openssl rand -base64 32`) |
 | `NEXTAUTH_URL` | Application URL for auth callbacks | `http://localhost:3033` |
 

@@ -1,3 +1,5 @@
+import { isSettingsPayload, SETTINGS_UPDATE_EVENT } from "@/lib/sagra-settings";
+
 /**
  * Deduce il tipo di evento ordine dalla forma del payload.
  *
@@ -8,6 +10,9 @@ export function resolveOrderEventType(data: unknown): string | undefined {
     if (!data || typeof data !== "object" || Array.isArray(data)) return undefined;
     const payload = data as Record<string, unknown>;
 
+    if (isSettingsPayload(payload)) {
+        return SETTINGS_UPDATE_EVENT;
+    }
     if (payload.orderId !== undefined && payload.stationId !== undefined) {
         return "order-station-status-update";
     }

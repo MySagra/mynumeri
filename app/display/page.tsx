@@ -6,7 +6,6 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getWorkdayBounds, sortByDate } from "@/utils/utils";
 import { type DisplayMode, DISPLAY_MODE_KEY } from "@/components/settings/DisplayModeSettingsCard";
-import { EVENT_NAME_KEY } from "@/components/settings/GeneralSettingsCard";
 import { DISPLAY_ZOOM_KEY } from "@/components/settings/DisplayZoomSettingsCard";
 import type { DisplayConfig } from "@/lib/display-config-store";
 import { useTranslation } from "react-i18next";
@@ -15,6 +14,7 @@ import { subscribeSSE } from "@/lib/sse";
 import { resolveOrderEventType, statusForOrderEvent } from "@/lib/order-events";
 import { withMinimumDelay } from "@/lib/minimum-delay";
 import { useAnimatedOrders } from "@/hooks/use-animated-orders";
+import { applySagraSettings, loadSagraSettings, useSagraSettings, SETTINGS_UPDATE_EVENT } from "@/lib/sagra-settings";
 
 const PAGE_INTERVAL = 10000;
 
@@ -317,7 +317,10 @@ export default function Display() {
     const { t } = useTranslation();
     const router = useRouter();
     const [displayMode, setDisplayMode] = useState<DisplayMode>("ready");
-    const [showNumbers, setShowNumbers] = useState<boolean | null>(null);
+    // Impostazioni centralizzate: nome sagra, timezone, showNumbers.
+    const sagraSettings = useSagraSettings();
+    const showNumbers = sagraSettings?.showNumbers ?? null;
+    const eventName = sagraSettings?.sagraName ?? "";
     const [autoScrollPagesEnabled, setAutoScrollPagesEnabled] = useState(true);
     const [stations, setStations] = useState<Station[]>([]);
     const [stationsLoaded, setStationsLoaded] = useState(false);
@@ -363,7 +366,6 @@ export default function Display() {
     const displayModeRef = useRef<DisplayMode>("ready");
 
     const [announcement, setAnnouncement] = useState("");
-    const [eventName, setEventName] = useState("");
 
     // Full-screen overlay
     const [fullscreenAlertEnabled, setFullscreenAlertEnabled] = useState(true);
@@ -383,7 +385,8 @@ export default function Display() {
     // ------------------------------------------------------------------
     const fetchOrders = useCallback(async () => {
         try {
-            const { dateFrom, dateTo } = getWorkdayBounds();
+            const settings = await loadSagraSettings();
+            const { dateFrom, dateTo } = getWorkdayBounds(settings?.timezone);
             const dateParams = `&dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`;
             const json = await apiFetch<{ data?: Order[]; orders?: Order[] }>(`/api/orders?limit=100${dateParams}&include=ordersStationsStates`);
             const orders: Order[] = json.data || json.orders || (Array.isArray(json) ? json : []);
@@ -413,26 +416,20 @@ export default function Display() {
             .then(res => res.ok ? res.json() : null)
             .then(cfg => {
                 if (!cfg) {
-                    const storedName = localStorage.getItem(EVENT_NAME_KEY);
-                    if (storedName) setEventName(storedName);
                     const storedMode = localStorage.getItem(DISPLAY_MODE_KEY) as DisplayMode | null;
                     if (storedMode && ["ready", "preparing", "hybrid"].includes(storedMode)) { setDisplayMode(storedMode); displayModeRef.current = storedMode; }
                     fetchOrders();
                     return;
                 }
-                if (cfg.eventName !== undefined) setEventName(cfg.eventName);
                 const mode = cfg.displayMode as DisplayMode;
                 if (mode && ["ready", "preparing", "hybrid"].includes(mode)) { setDisplayMode(mode); displayModeRef.current = mode; }
                 if (typeof cfg.announcement === "string") setAnnouncement(cfg.announcement);
-                if (typeof cfg.showNumbers === "boolean") setShowNumbers(cfg.showNumbers);
                 if (typeof cfg.fullscreenAlertEnabled === "boolean") { fullscreenAlertEnabledRef.current = cfg.fullscreenAlertEnabled; setFullscreenAlertEnabled(cfg.fullscreenAlertEnabled); }
                 if (typeof cfg.autoScrollPagesEnabled === "boolean") setAutoScrollPagesEnabled(cfg.autoScrollPagesEnabled);
                 if (typeof cfg.displayZoom === "number" && cfg.displayZoom >= 50 && cfg.displayZoom <= 200) { setDisplayZoom(cfg.displayZoom); localStorage.setItem(DISPLAY_ZOOM_KEY, String(cfg.displayZoom)); }
                 fetchOrders();
             })
             .catch(() => {
-                const storedName = localStorage.getItem(EVENT_NAME_KEY);
-                if (storedName) setEventName(storedName);
                 const storedMode = localStorage.getItem(DISPLAY_MODE_KEY) as DisplayMode | null;
                 if (storedMode && ["ready", "preparing", "hybrid"].includes(storedMode)) { setDisplayMode(storedMode); displayModeRef.current = storedMode; }
                 const storedZoom = localStorage.getItem(DISPLAY_ZOOM_KEY);
@@ -450,7 +447,6 @@ export default function Display() {
             onMessage: (payload) => {
                 if (!payload || typeof payload !== "object") return;
                 const cfg = payload as Partial<DisplayConfig>;
-                if (cfg.eventName !== undefined) setEventName(cfg.eventName);
                 const mode = cfg.displayMode as DisplayMode;
                 if (mode && ["ready", "preparing", "hybrid"].includes(mode)) { setDisplayMode(mode); displayModeRef.current = mode; }
                 if (typeof cfg.fullscreenAlertEnabled === "boolean") { fullscreenAlertEnabledRef.current = cfg.fullscreenAlertEnabled; setFullscreenAlertEnabled(cfg.fullscreenAlertEnabled); }
@@ -490,9 +486,15 @@ export default function Display() {
             // in ultima istanza, viene dedotto dalla forma del JSON.
             resolveType: resolveOrderEventType,
             // Refetch full state on every reconnect to resync after any missed events
-            onOpen: ({ reconnect }) => { if (reconnect) fetchOrders(); },
+            onOpen: ({ reconnect }) => {
+                if (!reconnect) return;
+                void loadSagraSettings(true);
+                fetchOrders();
+            },
             onError: err => console.error("SSE display:", err),
             on: {
+                [SETTINGS_UPDATE_EVENT]: (data) => { applySagraSettings(data); },
+
                 "confirmed-order": (data, _frame, type) => {
                     try {
                         const raw = data as ReadyOrder;
@@ -625,7 +627,7 @@ export default function Display() {
     const effectivePreparing = displayMode === "preparing" || (displayMode === "hybrid" && !hybridAllowed);
 
     // ------------------------------------------------------------------
-    // Render only after the server has provided SHOW_NUMBERS.
+    // Render only after the backend settings (showNumbers) are loaded.
     // ------------------------------------------------------------------
     if (showNumbers === null) return <div className="h-screen bg-gray-100" />;
 

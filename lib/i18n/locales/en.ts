@@ -1,5 +1,8 @@
 export const en = {
   translation: {
+    header: {
+      clockTooltip: "Current time ({{timezone}})"
+    },
     common: {
       poweredBy: "Powered by",
       noPickupStations: "No pickup stations configured",
@@ -78,10 +81,11 @@ export const en = {
       saveError: "Error during saving",
       general: "General",
       generalDesc: "Configure the general settings of the mynumeri interface",
-      eventName: "Festival / event name",
+      eventName: "Festival name",
       eventNameDesc: "Shown in the display header next to the title",
-      eventNamePlaceholder: "e.g. Festival 2026",
-      eventNameSaved: "Event name saved",
+      timezone: "Time zone",
+      timezoneDesc: "Used to compute the orders' working day",
+      managedByBackend: "These settings are managed centrally by MySagra and update automatically.",
       settings: "Settings",
       backToManager: "Back to Manager",
       fullscreenAlertEnabled: "Full-screen alert",

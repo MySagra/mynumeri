@@ -8,7 +8,6 @@ export type DisplayMode = "ready" | "preparing" | "hybrid";
 
 export interface DisplayConfig {
     announcement: string;
-    eventName: string;
     displayMode: DisplayMode;
     fullscreenAlertEnabled: boolean;
     autoScrollPagesEnabled: boolean;
@@ -22,7 +21,6 @@ const CONFIG_PATH = path.join(process.cwd(), "data", "display-config.json");
 
 const DEFAULT_CONFIG: DisplayConfig = {
     announcement: "",
-    eventName: "",
     displayMode: "ready",
     fullscreenAlertEnabled: true,
     autoScrollPagesEnabled: true,
@@ -40,13 +38,15 @@ function loadFromFile(): void {
         if (fs.existsSync(CONFIG_PATH)) {
             const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
             const parsed = JSON.parse(raw) as Partial<DisplayConfig> & {
+                eventName?: string;
                 stationsEnabled?: boolean;
                 numberDisplay?: string;
                 ticketNumberMax?: number;
             };
             // Discard retired preferences from older config files.
-            const { stationsEnabled: _stations, numberDisplay: _display, ticketNumberMax: _max, ...current } = parsed;
-            void _stations; void _display; void _max;
+            // eventName now comes from the backend settings (sagra.name).
+            const { eventName: _name, stationsEnabled: _stations, numberDisplay: _display, ticketNumberMax: _max, ...current } = parsed;
+            void _name; void _stations; void _display; void _max;
             cache = { ...DEFAULT_CONFIG, ...current };
         }
     } catch {
@@ -65,7 +65,7 @@ function saveToFile(): void {
 
 // SSE subscribers — notified when the announcement text changes
 const announcementSubscribers = new Set<Subscriber>();
-// SSE subscribers — notified when displayMode or eventName changes
+// SSE subscribers — notified when display preferences change
 const configSubscribers = new Set<ConfigSubscriber>();
 
 export function getConfig(): DisplayConfig {
@@ -85,7 +85,7 @@ export function updateConfig(patch: Partial<DisplayConfig>): DisplayConfig {
         });
     }
 
-    if (patch.displayMode !== undefined || patch.eventName !== undefined ||
+    if (patch.displayMode !== undefined ||
         patch.fullscreenAlertEnabled !== undefined ||
         patch.autoScrollPagesEnabled !== undefined || patch.displayZoom !== undefined) {
         configSubscribers.forEach((fn) => {
